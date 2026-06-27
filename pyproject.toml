@@ -18,6 +18,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "mypy", "ruff"]
 
+[project.scripts]
+bridge-mcp = "bridge_mcp.server:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/bridge_mcp"]
 

@@ -9,6 +9,7 @@ pip install -e ".[dev]"             # the package, editable, with the dev tools
 pytest                              # run the tests
 mypy src                            # strict type check
 ruff check . && ruff format --check .
+mcp dev src/bridge_mcp/server.py    # run the server in the MCP inspector
 ```
 
 Regenerating the graphs database additionally needs nauty's `geng` on the PATH, for
