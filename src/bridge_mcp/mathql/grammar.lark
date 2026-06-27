@@ -1,0 +1,55 @@
+// MathQL expression grammar. Precedence is encoded by the rule ladder, lowest first.
+// Aliases (-> name) select the transformer method in parser.py.
+
+?start: expr
+
+?expr: "if" expr "then" expr "else" expr -> ite
+     | or_expr
+
+?or_expr: or_expr ("||"|"∨") and_expr -> or_
+        | and_expr
+
+?and_expr: and_expr ("&&"|"∧") cmp_expr -> and_
+         | cmp_expr
+
+?cmp_expr: add_expr ("=="|"=") add_expr -> eq
+         | add_expr ("!="|"≠") add_expr -> ne
+         | add_expr ("<="|"≤") add_expr -> le
+         | add_expr (">="|"≥") add_expr -> ge
+         | add_expr "<" add_expr         -> lt
+         | add_expr ">" add_expr         -> gt
+         | add_expr
+
+?add_expr: add_expr "+" mul_expr -> add
+         | add_expr "-" mul_expr -> sub
+         | mul_expr
+
+?mul_expr: mul_expr "*" unary_expr -> mul
+         | unary_expr
+
+?unary_expr: "defined" unary_expr   -> defined
+           | "undefined" unary_expr -> undefined
+           | ("!"|"¬") unary_expr   -> not_
+           | "-" unary_expr         -> neg
+           | postfix_expr
+
+?postfix_expr: postfix_expr "." INT   -> proj
+             | postfix_expr "." IDENT -> field
+             | atom
+
+?atom: INT                       -> int_
+     | "true"                    -> true_
+     | "false"                   -> false_
+     | STRING                    -> str_
+     | "[" "]"                   -> empty_list
+     | "[" expr ("," expr)* "]"  -> list_
+     | "(" expr ")"
+     | "(" expr ("," expr)+ ")"  -> tuple_
+     | IDENT                     -> const
+
+IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
+INT: /[0-9]+/
+STRING: /"(?:[^"\\]|\\.)*"/
+
+%import common.WS
+%ignore WS
