@@ -19,7 +19,14 @@ import networkx as nx
 
 DEFAULT_MAX_VERTICES = 8
 GENG = "geng"
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "graphs-small.db"
+DB_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "src"
+    / "bridge_mcp"
+    / "mathql"
+    / "databases"
+    / "small-graphs.db"
+)
 
 
 # --- invariants not provided directly by networkx ---

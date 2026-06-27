@@ -1,15 +1,14 @@
-"""End-to-end checks against a local graphs-small.db, skipped when it is absent."""
+"""End-to-end checks against the bundled database, skipped when it is absent."""
 
 import sqlite3
 from collections.abc import Iterator
-from pathlib import Path
 
 import pytest
 
-from bridge_mcp.mathql.databases.graphs_small import database
-from bridge_mcp.mathql.execute import run_query
+from bridge_mcp.mathql.databases.small_graphs import database
+from bridge_mcp.mathql.execute import database_path, run_query
 
-DB = Path(__file__).resolve().parent.parent / "data" / "graphs-small.db"
+DB = database_path()
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 """Checks for the graphs-small database: SQL rendering and the schema description."""
 
-from bridge_mcp.mathql.databases.graphs_small import database
+from bridge_mcp.mathql.databases.small_graphs import database
 from bridge_mcp.mathql.execute import render_query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query

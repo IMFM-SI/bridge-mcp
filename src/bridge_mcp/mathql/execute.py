@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections.abc import Mapping, Sequence
+from importlib import resources
+from pathlib import Path
 from typing import Any
 
 from bridge_mcp.mathql import query
@@ -12,6 +15,16 @@ from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.sql import render, render_direction
 from bridge_mcp.mathql.typecheck import check_query
+
+
+def database_path() -> Path:
+    """The bundled small-graphs database, or the path in `BRIDGE_MCP_DB` if set."""
+    override = os.environ.get("BRIDGE_MCP_DB")
+    if override is not None:
+        return Path(override)
+    return Path(
+        str(resources.files("bridge_mcp.mathql.databases").joinpath("small-graphs.db"))
+    )
 
 
 def _sql_context(database: Database, variables: tuple[query.Binding, ...]) -> SqlContext:

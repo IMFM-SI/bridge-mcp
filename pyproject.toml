@@ -21,6 +21,9 @@ dev = ["pytest", "mypy", "ruff"]
 [project.scripts]
 bridge-mcp = "bridge_mcp.server:main"
 
+[tool.hatch.build]
+artifacts = ["src/bridge_mcp/mathql/databases/*.db"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/bridge_mcp"]
 

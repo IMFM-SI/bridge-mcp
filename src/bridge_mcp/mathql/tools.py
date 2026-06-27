@@ -5,18 +5,14 @@ from __future__ import annotations
 import contextlib
 import json
 import sqlite3
-from pathlib import Path
+from importlib import resources
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.mathql.databases.graphs_small import database
+from bridge_mcp.mathql.databases.small_graphs import database
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.execute import run_query
-
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_DB_PATH = _REPO_ROOT / "data" / "graphs-small.db"
-_GRAMMAR_PATH = _REPO_ROOT / "docs" / "query-grammar.md"
+from bridge_mcp.mathql.execute import database_path, run_query
 
 _SUMMARY = """## Writing queries
 `query` takes domains (e.g. [["g", "Graph"]]); output (["g.field", ...], or ["g"] for the
@@ -69,7 +65,7 @@ def register(mcp: FastMCP) -> None:
         if limit is not None:
             request["limit"] = limit
         try:
-            with contextlib.closing(sqlite3.connect(_DB_PATH)) as connection:
+            with contextlib.closing(sqlite3.connect(database_path())) as connection:
                 return run_query(connection, database, request)
         except MathQLError as error:
             raise ValueError(str(error)) from error
@@ -83,4 +79,8 @@ def register(mcp: FastMCP) -> None:
     def grammar() -> str:
         """The full query-language grammar: the JSON query shape, the types, the
         expression grammar with precedence, and examples."""
-        return _GRAMMAR_PATH.read_text(encoding="utf-8")
+        return (
+            resources.files("bridge_mcp.mathql")
+            .joinpath("query-grammar.md")
+            .read_text(encoding="utf-8")
+        )
