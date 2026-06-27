@@ -2,10 +2,10 @@
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp import graph
+from bridge_mcp import graph, mathql
 from bridge_mcp.instructions import build_instructions
 
-COMPONENTS = (graph,)
+COMPONENTS = (mathql, graph)
 
 
 def build() -> FastMCP:
