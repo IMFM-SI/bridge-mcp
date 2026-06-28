@@ -1,6 +1,8 @@
-"""The graph component's tools: decode a graph6 string into structure, via networkx.
+"""The graph component's tools, networkx-backed.
 
-Vertices are numbered 0..n-1.
+A `graph6` string encodes a graph; these tools build one from an edge list or adjacency
+matrix, decode and analyze any graph6, compare graphs, and draw one. Vertices are numbered
+0..n-1.
 """
 
 from collections.abc import Callable
@@ -8,101 +10,297 @@ from typing import Any
 
 import networkx
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Image
+
+from bridge_mcp.graph.invariants import all_invariants, minimal_coloring
 
 INSTRUCTIONS = """## Graph tools
-A `graph6` string encodes a graph but is opaque on its own. These tools decode it
-(vertices are numbered 0..n-1):
-- `edge_list` — vertex count and edges;
-- `neighbors`, `shortest_path` — a vertex's neighbors, a path between two vertices;
-- `max_clique`, `max_independent_set`, `connected_components` — exact witnesses for the
-  clique number, independence number, and component count;
-- `coloring` — a proper coloring (greedy; may exceed the chromatic number)."""
+A `graph6` string encodes a graph (vertices 0..n-1). Build one from a graph you have, or
+analyze, compare, and draw any graph6:
+- construct: `graph6_from_edges`, `graph6_from_adjacency` → a graph6 string;
+- decode: `edge_list`, `neighbors`, `shortest_path`, `connected_components`;
+- invariants: `invariants` (the full set for any graph);
+- witnesses: `max_clique`, `max_independent_set`, `minimum_vertex_cover`, `coloring`
+  (greedy), `optimal_coloring` (exact), `maximum_matching`, `center`, `periphery`,
+  `articulation_points`, `bridges`, `spanning_tree`;
+- compare: `is_isomorphic`, `is_subgraph`, `is_induced_subgraph`;
+- centrality: `centrality` (degree / betweenness / closeness / pagerank);
+- visualize: `draw` → an image of the graph (optionally shaded by a vertex coloring)."""
+
+
+def _decode(graph6: str) -> networkx.Graph:
+    return networkx.from_graph6_bytes(graph6.encode())
+
+
+# --- construction ---
+
+
+def graph6_from_edges(num_vertices: int, edges: list[list[int]]) -> str:
+    """Build a graph on vertices 0..num_vertices-1 with the given edges; return its graph6.
+
+    The result encodes this labeling and is not necessarily nauty's canonical form, so it
+    need not equal the graph6 stored in the Graph8 database; to find a graph there, query by
+    invariants or use `is_isomorphic`.
+    """
+    graph = networkx.Graph()
+    graph.add_nodes_from(range(num_vertices))
+    graph.add_edges_from((u, v) for u, v in edges)
+    data: bytes = networkx.to_graph6_bytes(graph, header=False)
+    return data.decode().strip()
+
+
+def graph6_from_adjacency(matrix: list[list[int]]) -> str:
+    """Build a graph from a 0/1 adjacency matrix; return its graph6.
+
+    The result is not necessarily nauty's canonical form, so it need not equal the graph6
+    stored in the Graph8 database (see `graph6_from_edges`).
+    """
+    n = len(matrix)
+    graph = networkx.Graph()
+    graph.add_nodes_from(range(n))
+    graph.add_edges_from((i, j) for i in range(n) for j in range(i + 1, n) if matrix[i][j])
+    data: bytes = networkx.to_graph6_bytes(graph, header=False)
+    return data.decode().strip()
+
+
+# --- decoding ---
 
 
 def edge_list(graph6: str) -> dict[str, object]:
     """Decode a graph6 string to its edge list.
 
-    Returns {"num_vertices": n, "edges": [[u, v], ...]} with vertices 0..n-1; the
-    vertex count is included so isolated vertices are not lost.
+    Returns {"num_vertices": n, "edges": [[u, v], ...]}; the vertex count is included so
+    isolated vertices are not lost.
     """
-    g = networkx.from_graph6_bytes(graph6.encode())
+    graph = _decode(graph6)
     return {
-        "num_vertices": g.number_of_nodes(),
-        "edges": sorted([min(u, v), max(u, v)] for u, v in g.edges()),
+        "num_vertices": graph.number_of_nodes(),
+        "edges": sorted([min(u, v), max(u, v)] for u, v in graph.edges()),
     }
 
 
 def neighbors(graph6: str, vertex: int) -> list[int]:
-    """The neighbors of `vertex` (0-indexed) in the graph6-encoded graph."""
-    g = networkx.from_graph6_bytes(graph6.encode())
-    return sorted(g.neighbors(vertex))
+    """The neighbors of `vertex` (0-indexed)."""
+    return sorted(_decode(graph6).neighbors(vertex))
 
 
 def shortest_path(graph6: str, source: int, target: int) -> dict[str, object]:
     """A shortest path between `source` and `target` (0-indexed).
 
-    Returns {"length": k, "path": [source, ..., target]}; "path" is absent and
-    "length" is null when the two vertices lie in different components.
+    Returns {"length": k, "path": [...]}; "path" is absent and "length" is null when the
+    two vertices lie in different components.
     """
-    g = networkx.from_graph6_bytes(graph6.encode())
-    if networkx.has_path(g, source, target):
-        path = networkx.shortest_path(g, source, target)
+    graph = _decode(graph6)
+    if networkx.has_path(graph, source, target):
+        path = networkx.shortest_path(graph, source, target)
         return {"length": len(path) - 1, "path": path}
     else:
         return {"length": None}
 
 
-def max_clique(graph6: str) -> list[int]:
-    """A maximum clique: a largest set of pairwise-adjacent vertices.
+def connected_components(graph6: str) -> list[list[int]]:
+    """The connected components, each as a sorted vertex list."""
+    return [sorted(component) for component in networkx.connected_components(_decode(graph6))]
 
-    Exact; its size is the graph's clique number.
-    """
-    g = networkx.from_graph6_bytes(graph6.encode())
-    clique, _ = networkx.max_weight_clique(g, weight=None)
+
+# --- invariants ---
+
+
+def invariants(graph6: str) -> dict[str, object]:
+    """All `Graph8` invariants computed for the given graph: order, size, degree sequence,
+    regularity, components, connectivity, diameter, radius, girth, the tree/forest/
+    bipartite/planar/eulerian flags, triangle count, clique number, independence number,
+    chromatic number, and automorphism count."""
+    return all_invariants(_decode(graph6))
+
+
+# --- witnesses ---
+
+
+def max_clique(graph6: str) -> list[int]:
+    """A maximum clique (largest set of pairwise-adjacent vertices); exact."""
+    clique, _ = networkx.max_weight_clique(_decode(graph6), weight=None)
     return sorted(clique)
 
 
 def max_independent_set(graph6: str) -> list[int]:
-    """A maximum independent set: a largest set of pairwise-nonadjacent vertices.
-
-    Exact (a maximum clique of the complement); its size is the independence number.
-    """
-    g = networkx.from_graph6_bytes(graph6.encode())
-    clique, _ = networkx.max_weight_clique(networkx.complement(g), weight=None)
+    """A maximum independent set (largest set of pairwise-nonadjacent vertices); exact."""
+    clique, _ = networkx.max_weight_clique(networkx.complement(_decode(graph6)), weight=None)
     return sorted(clique)
 
 
-def connected_components(graph6: str) -> list[list[int]]:
-    """The connected components, each as a sorted vertex list."""
-    g = networkx.from_graph6_bytes(graph6.encode())
-    return [sorted(component) for component in networkx.connected_components(g)]
+def minimum_vertex_cover(graph6: str) -> list[int]:
+    """A smallest vertex set meeting every edge (the complement of a maximum independent
+    set); exact."""
+    graph = _decode(graph6)
+    independent, _ = networkx.max_weight_clique(networkx.complement(graph), weight=None)
+    return sorted(set(graph.nodes) - set(independent))
 
 
 def coloring(graph6: str) -> dict[str, object]:
     """A proper vertex coloring, computed greedily (DSATUR).
 
-    Returns {"num_colors": k, "coloring": [[vertex, color], ...]} with colors 0..k-1.
-    The coloring is proper but heuristic: it may use more colors than the graph's
-    chromatic number.
+    Returns {"num_colors": k, "coloring": [[vertex, color], ...]}; proper but heuristic,
+    so it may use more colors than the chromatic number (see `optimal_coloring`).
     """
-    g = networkx.from_graph6_bytes(graph6.encode())
-    colors = networkx.greedy_color(g, strategy="DSATUR")
+    colors = networkx.greedy_color(_decode(graph6), strategy="DSATUR")
     num_colors = max(colors.values()) + 1 if colors else 0
+    return {"num_colors": num_colors, "coloring": [[v, colors[v]] for v in sorted(colors)]}
+
+
+def optimal_coloring(graph6: str) -> dict[str, object]:
+    """An exact proper coloring using the chromatic number of colors.
+
+    Returns {"num_colors": k, "coloring": [[vertex, color], ...]} with colors 0..k-1.
+    """
+    colors = minimal_coloring(_decode(graph6))
     return {
-        "num_colors": num_colors,
+        "num_colors": len(set(colors.values())),
         "coloring": [[v, colors[v]] for v in sorted(colors)],
     }
 
 
+def maximum_matching(graph6: str) -> list[list[int]]:
+    """A largest set of pairwise-disjoint edges."""
+    matching = networkx.max_weight_matching(_decode(graph6))
+    return sorted([min(u, v), max(u, v)] for u, v in matching)
+
+
+def center(graph6: str) -> list[int]:
+    """The vertices of minimum eccentricity. Requires a connected graph."""
+    graph = _decode(graph6)
+    if not networkx.is_connected(graph):
+        raise ValueError("center is undefined for a disconnected graph")
+    return sorted(networkx.center(graph))
+
+
+def periphery(graph6: str) -> list[int]:
+    """The vertices of maximum eccentricity. Requires a connected graph."""
+    graph = _decode(graph6)
+    if not networkx.is_connected(graph):
+        raise ValueError("periphery is undefined for a disconnected graph")
+    return sorted(networkx.periphery(graph))
+
+
+def articulation_points(graph6: str) -> list[int]:
+    """The cut vertices: vertices whose removal increases the number of components."""
+    return sorted(networkx.articulation_points(_decode(graph6)))
+
+
+def bridges(graph6: str) -> list[list[int]]:
+    """The cut edges: edges whose removal increases the number of components."""
+    return sorted([min(u, v), max(u, v)] for u, v in networkx.bridges(_decode(graph6)))
+
+
+def spanning_tree(graph6: str) -> list[list[int]]:
+    """The edges of a spanning tree (a spanning forest if the graph is disconnected)."""
+    tree = networkx.minimum_spanning_tree(_decode(graph6))
+    return sorted([min(u, v), max(u, v)] for u, v in tree.edges())
+
+
+# --- relations ---
+
+
+def is_isomorphic(graph6_a: str, graph6_b: str) -> bool:
+    """Whether the two graphs are isomorphic."""
+    return bool(networkx.is_isomorphic(_decode(graph6_a), _decode(graph6_b)))
+
+
+def is_subgraph(pattern_graph6: str, host_graph6: str) -> bool:
+    """Whether `host` contains a subgraph isomorphic to `pattern` (monomorphism)."""
+    matcher = networkx.isomorphism.GraphMatcher(_decode(host_graph6), _decode(pattern_graph6))
+    return bool(matcher.subgraph_is_monomorphic())
+
+
+def is_induced_subgraph(pattern_graph6: str, host_graph6: str) -> bool:
+    """Whether `host` contains an induced subgraph isomorphic to `pattern`."""
+    matcher = networkx.isomorphism.GraphMatcher(_decode(host_graph6), _decode(pattern_graph6))
+    return bool(matcher.subgraph_is_isomorphic())
+
+
+# --- centrality ---
+
+
+def centrality(graph6: str, measure: str) -> list[list[float]]:
+    """Per-vertex centrality as [[vertex, score], ...].
+
+    `measure` is one of "degree", "betweenness", "closeness", "pagerank".
+    """
+    measures: dict[str, Any] = {
+        "degree": networkx.degree_centrality,
+        "betweenness": networkx.betweenness_centrality,
+        "closeness": networkx.closeness_centrality,
+        "pagerank": networkx.pagerank,
+    }
+    if measure not in measures:
+        raise ValueError(f"unknown measure {measure!r}; expected one of {sorted(measures)}")
+    scores = measures[measure](_decode(graph6))
+    return [[vertex, scores[vertex]] for vertex in sorted(scores)]
+
+
+# --- drawing ---
+
+
+def draw(graph6: str, vertex_coloring: list[list[int]] | None = None) -> Image:
+    """Render the graph as a PNG image, vertices labeled 0..n-1.
+
+    Pass `vertex_coloring` — a list of [vertex, color] pairs, as returned by `coloring` or
+    `optimal_coloring` — to shade vertices by color class.
+    """
+    import io
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    graph = _decode(graph6)
+    positions = networkx.spring_layout(graph, seed=0)
+    figure, axes = plt.subplots()
+    if vertex_coloring is None:
+        networkx.draw_networkx(graph, positions, ax=axes, with_labels=True)
+    else:
+        color_of = {vertex: color for vertex, color in vertex_coloring}
+        node_color = [color_of[vertex] for vertex in graph.nodes]
+        networkx.draw_networkx(
+            graph,
+            positions,
+            ax=axes,
+            with_labels=True,
+            node_color=node_color,
+            cmap=plt.cm.tab10,
+        )
+    axes.set_axis_off()
+    buffer = io.BytesIO()
+    figure.savefig(buffer, format="png", bbox_inches="tight")
+    plt.close(figure)
+    return Image(data=buffer.getvalue(), format="png")
+
+
 TOOLS: list[Callable[..., Any]] = [
+    graph6_from_edges,
+    graph6_from_adjacency,
     edge_list,
     neighbors,
     shortest_path,
+    connected_components,
+    invariants,
     max_clique,
     max_independent_set,
-    connected_components,
+    minimum_vertex_cover,
     coloring,
+    optimal_coloring,
+    maximum_matching,
+    center,
+    periphery,
+    articulation_points,
+    bridges,
+    spanning_tree,
+    is_isomorphic,
+    is_subgraph,
+    is_induced_subgraph,
+    centrality,
+    draw,
 ]
 
 

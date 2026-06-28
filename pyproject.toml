@@ -13,6 +13,7 @@ dependencies = [
     "mcp[cli]",
     "lark",
     "networkx",
+    "matplotlib",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +32,7 @@ packages = ["src/bridge_mcp"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = "networkx.*"
+module = ["networkx.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

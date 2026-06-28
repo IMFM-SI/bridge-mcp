@@ -13,6 +13,33 @@ This installs the `bridge-mcp` command together with a small bundled database of
 objects, so the server is ready to run with no further setup. Register `bridge-mcp` as a command
 with your MCP client.
 
+## Use with Claude Desktop
+
+To add the MCP Bridge to Claude Desktop you need to edit its JSON configuration file:
+
+* **MacOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`,
+* **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Under `mcpServers` section you add the following stanza:
+
+```json
+{
+  "mcpServers": {
+    "bridge-mcp": { "command": "⟨absolute-path⟩/bridge-mcp" }
+  }
+}
+```
+
+where `⟨absolute-path⟩` depends on where the `bridge-mcp` command has been installed:
+
+1. If you installed Bridge MCP with `pip` then `which bridge-mcp` should tell you the
+   absolute path to the executable.
+
+2. If you cloned the repository and would like to test the development version installed
+   therein, the absolute path takes the form `⟨absolute-path-to-bridge-mcp-repository⟩/.venv/bin/bridge-mcp`.
+
+You need to restart Claude Desktop for the setting to take effect.
+
 ## MathQL
 
 MathQL is a small, typed query language for asking mathematical questions about

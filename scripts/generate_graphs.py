@@ -4,18 +4,17 @@ each with a selection of invariants, using nauty's `geng` and networkx."""
 
 from __future__ import annotations
 
-import itertools
 import json
 import logging
-import math
 import sqlite3
 import subprocess
 import sys
-from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
 import networkx as nx
+
+from bridge_mcp.graph.invariants import automorphism_count, chromatic_number, degrees, girth
 
 DEFAULT_MAX_VERTICES = 8
 GENG = "geng"
@@ -27,56 +26,6 @@ DB_PATH = (
     / "databases"
     / "math-data.db"
 )
-
-
-# --- invariants not provided directly by networkx ---
-
-
-def girth(graph: nx.Graph) -> int | None:
-    """Length of a shortest cycle, or None if the graph is acyclic."""
-    best = math.inf
-    for source in graph:
-        distance = {source: 0}
-        parent: dict[object, object] = {source: None}
-        queue = deque([source])
-        while queue:
-            u = queue.popleft()
-            for v in graph[u]:
-                if v not in distance:
-                    distance[v] = distance[u] + 1
-                    parent[v] = u
-                    queue.append(v)
-                elif v != parent[u]:
-                    best = min(best, distance[u] + distance[v] + 1)
-    return None if best == math.inf else int(best)
-
-
-def chromatic_number(graph: nx.Graph) -> int:
-    """Exact chromatic number by backtracking, seeded at the clique number."""
-    nodes = list(graph)
-
-    def colorable(k: int) -> bool:
-        def extend(i: int, coloring: dict[object, int]) -> bool:
-            if i == len(nodes):
-                return True
-            u = nodes[i]
-            used = {coloring[v] for v in graph[u] if v in coloring}
-            return any(extend(i + 1, {**coloring, u: c}) for c in range(k) if c not in used)
-
-        return extend(0, {})
-
-    lower = max((len(c) for c in nx.find_cliques(graph)), default=0)
-    return next(k for k in itertools.count(max(lower, 1)) if colorable(k))
-
-
-def automorphism_count(graph: nx.Graph) -> int:
-    """Order of the automorphism group, by enumeration (small graphs only)."""
-    matcher = nx.isomorphism.GraphMatcher(graph, graph)
-    return sum(1 for _ in matcher.isomorphisms_iter())
-
-
-def degrees(graph: nx.Graph) -> list[int]:
-    return [d for _, d in graph.degree()]
 
 
 # --- the invariant schema: (column, sql_type, extractor) ---
