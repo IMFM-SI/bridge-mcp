@@ -134,7 +134,7 @@ _FIELDS = (
 _GRAPH = Domain(
     table="graph",
     fields=_FIELDS,
-    doc="A finite simple graph (no loops or multiple edges), up to isomorphism.",
+    doc="A finite simple graph on up to 8 vertices (no loops or multiple edges), up to isomorphism.",
 )
 
 database = Database(
@@ -143,12 +143,12 @@ database = Database(
         "selection of graph invariants."
     ),
     constants=(),
-    domains={"Graph": _GRAPH},
+    domains={"Graph8": _GRAPH},
     examples=(
         Example(
             "the trees on 5 vertices",
             {
-                "domains": [["g", "Graph"]],
+                "domains": [["g", "Graph8"]],
                 "output": ["g.graph6", "g.degree_sequence"],
                 "condition": "g.num_vertices == 5 && g.is_tree",
             },
@@ -156,7 +156,7 @@ database = Database(
         Example(
             "the three graphs on 5 vertices with the most edges",
             {
-                "domains": [["g", "Graph"]],
+                "domains": [["g", "Graph8"]],
                 "output": ["g.graph6", "g.num_edges"],
                 "condition": "g.num_vertices == 5",
                 "order": [["g.num_edges", "desc"]],
@@ -166,7 +166,7 @@ database = Database(
         Example(
             "connected non-planar graphs on at least 6 vertices, fewest vertices first",
             {
-                "domains": [["g", "Graph"]],
+                "domains": [["g", "Graph8"]],
                 "output": ["g.graph6", "g.num_vertices"],
                 "condition": "g.is_connected && !g.is_planar && g.num_vertices >= 6",
                 "order": [["g.num_vertices", "asc"]],
@@ -176,7 +176,7 @@ database = Database(
         Example(
             "pairs of graphs with equally many vertices where the first has fewer edges",
             {
-                "domains": [["g", "Graph"], ["h", "Graph"]],
+                "domains": [["g", "Graph8"], ["h", "Graph8"]],
                 "output": ["g.graph6", "h.graph6"],
                 "condition": "g.num_vertices == h.num_vertices && g.num_edges < h.num_edges",
                 "limit": 5,
@@ -185,7 +185,7 @@ database = Database(
         Example(
             "forests (girth undefined) on at most 4 vertices, returned whole",
             {
-                "domains": [["g", "Graph"]],
+                "domains": [["g", "Graph8"]],
                 "output": ["g"],
                 "condition": "undefined g.girth && g.num_vertices <= 4",
                 "limit": 5,
@@ -194,7 +194,7 @@ database = Database(
         Example(
             "the most irregular graphs, by the spread between max and min degree",
             {
-                "domains": [["g", "Graph"]],
+                "domains": [["g", "Graph8"]],
                 "output": ["g.graph6", "g.max_degree", "g.min_degree"],
                 "condition": "g.max_degree != g.min_degree",
                 "order": [["g.max_degree - g.min_degree", "desc"]],

@@ -26,7 +26,7 @@ vertices:
 
 ```json
 {
-  "domains": [["g", "Graph"]],
+  "domains": [["g", "Graph8"]],
   "output": ["g.graph6", "g.degree_sequence"],
   "condition": "g.num_vertices == 5 && g.is_tree"
 }
@@ -49,7 +49,7 @@ degree sequence, connectivity and number of components, diameter, radius, girth,
 planarity, bipartiteness, the chromatic number, the clique and independence numbers, the
 number of triangles, and the order of the automorphism group. Every invariant is both
 queryable in a condition and returnable in the output; the graph itself is stored in
-graph6 encoding. The single domain is `Graph` — call the `describe` tool for the full
+graph6 encoding. The single domain is `Graph8` — call the `describe` tool for the full
 field list. The database is generated with nauty and networkx
 (see `scripts/generate_graphs.py`).
 

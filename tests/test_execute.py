@@ -25,7 +25,7 @@ def test_triangle(connection: sqlite3.Connection) -> None:
         connection,
         database,
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6", "g.num_edges"],
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
@@ -38,7 +38,7 @@ def test_trees_on_five(connection: sqlite3.Connection) -> None:
         connection,
         database,
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6"],
             "condition": "g.num_vertices == 5 && g.is_tree",
         },
@@ -51,7 +51,7 @@ def test_degree_sequence_equality(connection: sqlite3.Connection) -> None:
         connection,
         database,
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6"],
             "condition": "g.degree_sequence == [2, 2, 2]",
         },
@@ -64,7 +64,7 @@ def test_whole_object(connection: sqlite3.Connection) -> None:
         connection,
         database,
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g"],
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },

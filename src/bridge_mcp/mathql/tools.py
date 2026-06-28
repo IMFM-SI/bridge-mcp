@@ -15,7 +15,7 @@ from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import database_path, run_query
 
 _SUMMARY = """## Writing queries
-`query` takes domains (e.g. [["g", "Graph"]]); output (["g.field", ...], or ["g"] for the
+`query` takes domains (e.g. [["g", "Graph8"]]); output (["g.field", ...], or ["g"] for the
 whole object); and optional condition, order ([expression, "asc"|"desc"] pairs), and
 limit. Conditions and order expressions use fields (g.num_vertices), literals, arithmetic
 (+ - *), comparisons (== != < <= > >=), booleans (&& || !), defined/undefined for absence,
@@ -51,7 +51,7 @@ def register(mcp: FastMCP) -> None:
     ) -> list[dict[str, object]]:
         """Run a MathQL query and return the matching rows.
 
-        domains: variable bindings, e.g. [["g", "Graph"]].
+        domains: variable bindings, e.g. [["g", "Graph8"]].
         output: items to return, each "x" (the whole object) or "x.field".
         condition: a boolean expression over the bound variables (optional).
         order: [expression, "asc"|"desc"] pairs (optional).

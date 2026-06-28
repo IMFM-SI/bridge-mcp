@@ -13,7 +13,7 @@ def _typed(request: dict) -> object:
 def test_render_simple() -> None:
     q = _typed(
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6"],
             "condition": "g.num_vertices == 5",
         }
@@ -28,7 +28,7 @@ def test_render_simple() -> None:
 def test_render_order_and_limit() -> None:
     q = _typed(
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6"],
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
@@ -42,7 +42,7 @@ def test_render_order_and_limit() -> None:
 def test_render_list_literal() -> None:
     q = _typed(
         {
-            "domains": [["g", "Graph"]],
+            "domains": [["g", "Graph8"]],
             "output": ["g.graph6"],
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
@@ -54,7 +54,7 @@ def test_describe() -> None:
     described = database.describe()
     assert described["overview"].startswith("All non-isomorphic")
     domains = described["domains"]
-    assert domains[0]["name"] == "Graph"
+    assert domains[0]["name"] == "Graph8"
     fields = {f["label"]: f["type"] for f in domains[0]["fields"]}
     assert fields["graph6"] == "string"
     assert fields["degree_sequence"] == "list int"
