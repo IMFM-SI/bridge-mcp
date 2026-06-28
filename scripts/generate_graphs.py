@@ -25,7 +25,7 @@ DB_PATH = (
     / "bridge_mcp"
     / "mathql"
     / "databases"
-    / "small-graphs.db"
+    / "math-data.db"
 )
 
 

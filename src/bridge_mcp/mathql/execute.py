@@ -18,13 +18,11 @@ from bridge_mcp.mathql.typecheck import check_query
 
 
 def database_path() -> Path:
-    """The bundled small-graphs database, or the path in `BRIDGE_MCP_DB` if set."""
+    """The bundled `math_data` database, or the path in `BRIDGE_MCP_DB` if set."""
     override = os.environ.get("BRIDGE_MCP_DB")
     if override is not None:
         return Path(override)
-    return Path(
-        str(resources.files("bridge_mcp.mathql.databases").joinpath("small-graphs.db"))
-    )
+    return Path(str(resources.files("bridge_mcp.mathql.databases").joinpath("math-data.db")))
 
 
 def _sql_context(database: Database, variables: tuple[query.Binding, ...]) -> SqlContext:

@@ -9,8 +9,8 @@ GitHub:
 
     pip install git+https://github.com/IMFM-SI/bridge-mcp.git
 
-This installs the `bridge-mcp` command together with the bundled `small-graphs` database,
-so the server is ready to run with no further setup. Register `bridge-mcp` as a command
+This installs the `bridge-mcp` command together with a small bundled database of mathematical
+objects, so the server is ready to run with no further setup. Register `bridge-mcp` as a command
 with your MCP client.
 
 ## MathQL
@@ -43,7 +43,7 @@ them with these tools.
 
 ### Small graphs
 
-The `small-graphs` database holds every non-isomorphic simple graph on up to 8 vertices
+The database holds every non-isomorphic simple graph on up to 8 vertices
 (13,598 in all), each annotated with a selection of invariants: order and size, the
 degree sequence, connectivity and number of components, diameter, radius, girth,
 planarity, bipartiteness, the chromatic number, the clique and independence numbers, the

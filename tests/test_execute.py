@@ -5,7 +5,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from bridge_mcp.mathql.databases.small_graphs import database
+from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path, run_query
 
 DB = database_path()

@@ -10,7 +10,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.mathql.databases.small_graphs import database
+from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import database_path, run_query
 
