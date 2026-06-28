@@ -11,7 +11,8 @@ from bridge_mcp.graph.tools import (
     center,
     connected_components,
     coloring,
-    draw,
+    draw_graph,
+    draw_graph6,
     edge_list,
     graph6_from_adjacency,
     graph6_from_edges,
@@ -19,6 +20,7 @@ from bridge_mcp.graph.tools import (
     is_induced_subgraph,
     is_isomorphic,
     is_subgraph,
+    layout,
     max_clique,
     max_independent_set,
     maximum_matching,
@@ -161,8 +163,19 @@ def test_centrality() -> None:
 # --- drawing ---
 
 
-def test_draw_returns_png() -> None:
-    image = draw(TRIANGLE)
-    assert image.data[:4] == b"\x89PNG"
-    colored = draw(TRIANGLE, [[0, 0], [1, 1], [2, 2]])
-    assert colored.data[:4] == b"\x89PNG"
+def test_layout() -> None:
+    coords = layout(3, [[0, 1], [1, 2]])
+    assert len(coords) == 3
+    assert all(len(point) == 2 for point in coords)
+    assert all(-1 <= value <= 1 for point in coords for value in point)
+
+
+def test_draw_graph() -> None:
+    svg = draw_graph(3, [[0, 1], [1, 2], [0, 2]])
+    assert "<svg" in svg and "<circle" in svg and "<text" not in svg
+    assert "<svg" in draw_graph(3, [[0, 1]], [[0, 0], [1, 1], [2, 2]])
+
+
+def test_draw_graph6() -> None:
+    assert "<svg" in draw_graph6(TRIANGLE)
+    assert "<svg" in draw_graph6(TRIANGLE, [[0, 0], [1, 1], [2, 2]])

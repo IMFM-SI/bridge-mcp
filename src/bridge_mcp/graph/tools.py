@@ -5,18 +5,19 @@ matrix, decode and analyze any graph6, compare graphs, and draw one. Vertices ar
 0..n-1.
 """
 
+import math
 from collections.abc import Callable
 from typing import Any
 
 import networkx
 
-from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.fastmcp import FastMCP
 
 from bridge_mcp.graph.invariants import all_invariants, minimal_coloring
 
 INSTRUCTIONS = """## Graph tools
 A `graph6` string encodes a graph (vertices 0..n-1). Build one from a graph you have, or
-analyze, compare, and draw any graph6:
+analyze and compare any graph6, or draw a graph for quick visual inspection:
 - construct: `graph6_from_edges`, `graph6_from_adjacency` → a graph6 string;
 - decode: `edge_list`, `neighbors`, `shortest_path`, `connected_components`;
 - invariants: `invariants` (the full set for any graph);
@@ -25,11 +26,21 @@ analyze, compare, and draw any graph6:
   `articulation_points`, `bridges`, `spanning_tree`;
 - compare: `is_isomorphic`, `is_subgraph`, `is_induced_subgraph`;
 - centrality: `centrality` (degree / betweenness / closeness / pagerank);
-- visualize: `draw` → an image of the graph (optionally shaded by a vertex coloring)."""
+- visualize (unlabeled circles, for quick inspection, shown inline): `draw_graph6` (from a
+  graph6) or `draw_graph` (from num_vertices and edges) → a compact SVG, optionally shaded
+  by a vertex coloring; `layout` (num_vertices and edges) → vertex coordinates for drawing
+  it yourself."""
 
 
 def _decode(graph6: str) -> networkx.Graph:
     return networkx.from_graph6_bytes(graph6.encode())
+
+
+def _build(num_vertices: int, edges: list[list[int]]) -> networkx.Graph:
+    graph = networkx.Graph()
+    graph.add_nodes_from(range(num_vertices))
+    graph.add_edges_from(edges)
+    return graph
 
 
 # --- construction ---
@@ -241,40 +252,96 @@ def centrality(graph6: str, measure: str) -> list[list[float]]:
 # --- drawing ---
 
 
-def draw(graph6: str, vertex_coloring: list[list[int]] | None = None) -> Image:
-    """Render the graph as a PNG image, vertices labeled 0..n-1.
+# A small categorical palette for vertex colorings, indexed by color class.
+_SVG_PALETTE = [
+    "#4e79a7",
+    "#f28e2b",
+    "#e15759",
+    "#76b7b2",
+    "#59a14f",
+    "#edc948",
+    "#b07aa1",
+    "#ff9da7",
+    "#9c755f",
+    "#bab0ac",
+]
 
-    Pass `vertex_coloring` — a list of [vertex, color] pairs, as returned by `coloring` or
-    `optimal_coloring` — to shade vertices by color class.
-    """
-    import io
 
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    graph = _decode(graph6)
+def _svg(graph: networkx.Graph, vertex_coloring: list[list[int]] | None) -> str:
+    # Hand-built rather than via matplotlib's SVG backend: that backend wraps the drawing in
+    # page-sized scaffolding (a background rectangle, an axes group, clip-path definitions,
+    # RDF metadata) — kilobytes of noise around a few-node graph. Emitting <line>/<circle>
+    # directly keeps it minimal. Edges use `currentColor` so the drawing follows the host's
+    # light/dark theme; node fills stay literal so a vertex coloring keeps its meaning.
+    color_of = {vertex: color for vertex, color in (vertex_coloring or [])}
     positions = networkx.spring_layout(graph, seed=0)
-    figure, axes = plt.subplots()
-    if vertex_coloring is None:
-        networkx.draw_networkx(graph, positions, ax=axes, with_labels=True)
-    else:
-        color_of = {vertex: color for vertex, color in vertex_coloring}
-        node_color = [color_of[vertex] for vertex in graph.nodes]
-        networkx.draw_networkx(
-            graph,
-            positions,
-            ax=axes,
-            with_labels=True,
-            node_color=node_color,
-            cmap=plt.cm.tab10,
-        )
-    axes.set_axis_off()
-    buffer = io.BytesIO()
-    figure.savefig(buffer, format="png", bbox_inches="tight")
-    plt.close(figure)
-    return Image(data=buffer.getvalue(), format="png")
+    xs = [x for x, _ in positions.values()]
+    ys = [y for _, y in positions.values()]
+    size, radius, margin = 400.0, 12.0, 24.0
+
+    def place(value: float, lo: float, hi: float) -> float:
+        span = margin + radius
+        return size / 2 if hi == lo else span + (value - lo) / (hi - lo) * (size - 2 * span)
+
+    screen = {
+        vertex: (place(x, min(xs), max(xs)), size - place(y, min(ys), max(ys)))
+        for vertex, (x, y) in positions.items()
+    }
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size:g} {size:g}" '
+        f'fill="none" stroke="currentColor">'
+    ]
+    for u, v in graph.edges():
+        x1, y1 = screen[u]
+        x2, y2 = screen[v]
+        # trim the edge to the circle boundaries so it does not show inside the nodes
+        length = math.hypot(x2 - x1, y2 - y1)
+        if length > 2 * radius:
+            ux, uy = (x2 - x1) / length, (y2 - y1) / length
+            x1, y1 = x1 + ux * radius, y1 + uy * radius
+            x2, y2 = x2 - ux * radius, y2 - uy * radius
+        parts.append(f'  <line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}"/>')
+    for vertex in graph.nodes:
+        x, y = screen[vertex]
+        in_coloring = vertex in color_of
+        fill = _SVG_PALETTE[color_of[vertex] % len(_SVG_PALETTE)] if in_coloring else "none"
+        parts.append(f'  <circle cx="{x:.1f}" cy="{y:.1f}" r="{radius:g}" fill="{fill}"/>')
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
+def draw_graph6(graph6: str, vertex_coloring: list[list[int]] | None = None) -> str:
+    """Draw the graph6-encoded graph as a compact SVG of unlabeled circles and edges.
+
+    For quick visual inspection, meant to be shown inline. Pass `vertex_coloring` (a list of
+    [vertex, color] pairs, vertices 0..n-1) to shade vertices by color class.
+    """
+    return _svg(_decode(graph6), vertex_coloring)
+
+
+def draw_graph(
+    num_vertices: int,
+    edges: list[list[int]],
+    vertex_coloring: list[list[int]] | None = None,
+) -> str:
+    """Draw a graph on vertices 0..num_vertices-1 with the given edges as a compact SVG.
+
+    Unlabeled circles and edges, for quick visual inspection, meant to be shown inline. Pass
+    `vertex_coloring` (a list of [vertex, color] pairs) to shade vertices by color class.
+    """
+    return _svg(_build(num_vertices, edges), vertex_coloring)
+
+
+def layout(num_vertices: int, edges: list[list[int]]) -> list[list[float]]:
+    """A 2-D spring layout, as [[x, y], ...] indexed by vertex, with coordinates in [-1, 1].
+
+    For an agent that renders the graph itself; the drawing tools use the same layout.
+    """
+    positions = networkx.spring_layout(_build(num_vertices, edges), seed=0)
+    return [
+        [round(float(positions[vertex][0]), 4), round(float(positions[vertex][1]), 4)]
+        for vertex in range(num_vertices)
+    ]
 
 
 TOOLS: list[Callable[..., Any]] = [
@@ -300,7 +367,9 @@ TOOLS: list[Callable[..., Any]] = [
     is_subgraph,
     is_induced_subgraph,
     centrality,
-    draw,
+    draw_graph6,
+    draw_graph,
+    layout,
 ]
 
 

@@ -90,7 +90,7 @@ build graphs (from an edge list or an adjacency matrix), compare them, and draw 
 This is not the full list — for the complete, current set, list the tools from a running
 server (for example with `mcp dev`) or read their docstrings in
 `src/bridge_mcp/graph/tools.py`. A few, for flavor: `edge_list`, `invariants`,
-`optimal_coloring`, `is_isomorphic`, `draw`.
+`optimal_coloring`, `is_isomorphic`, `draw_graph`.
 
 ## Development and contributing
 
