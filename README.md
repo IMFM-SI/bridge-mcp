@@ -71,10 +71,9 @@ them with these tools.
 ### Small graphs
 
 The database holds every non-isomorphic simple graph on up to 8 vertices
-(13,598 in all), each annotated with a selection of invariants: order and size, the
-degree sequence, connectivity and number of components, diameter, radius, girth,
-planarity, bipartiteness, the chromatic number, the clique and independence numbers, the
-number of triangles, and the order of the automorphism group. Every invariant is both
+(13,598 in all), each annotated with a selection of invariants — among them the number of
+vertices and edges, the degree sequence, the chromatic number, and the automorphism
+count. Every invariant is both
 queryable in a condition and returnable in the output; the graph itself is stored in
 graph6 encoding. The single domain is `Graph8` — call the `describe` tool for the full
 field list. The database is generated with nauty and networkx
@@ -84,19 +83,14 @@ field list. The database is generated with nauty and networkx
 
 ### Graph tools based on `networkx`
 
-These tools complement the database: where the database records an invariant's *value* (say the
-clique number), these tools return a *witness* (an actual maximum clique). The available tools
-include:
+These tools complement the database: where the database records an invariant's *value* (say
+the clique number), these tools return a *witness* (an actual maximum clique). They also
+build graphs (from an edge list or an adjacency matrix), compare them, and draw them.
 
-- `edge_list` — the vertex count and the list of edges;
-- `neighbors`, `shortest_path` — a vertex's neighbors, a shortest path between two vertices;
-- `max_clique`, `max_independent_set`, `connected_components` — witnesses for the clique
-  number, independence number, and component count;
-- `coloring` — a proper vertex coloring.
-
-See the tool docstrings in `src/bridge_mcp/graph/tools.py`, or list the tools from a
-running server (for example with `mcp dev`), for their complete and up-to-date
-descriptions.
+This is not the full list — for the complete, current set, list the tools from a running
+server (for example with `mcp dev`) or read their docstrings in
+`src/bridge_mcp/graph/tools.py`. A few, for flavor: `edge_list`, `invariants`,
+`optimal_coloring`, `is_isomorphic`, `draw`.
 
 ## Development and contributing
 
