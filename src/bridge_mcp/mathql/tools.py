@@ -27,20 +27,27 @@ def _sym_ob_path() -> Path | None:
         return Path(value)
 
 
-def _available() -> dict[str, tuple[Database, Path]]:
-    """The databases whose files are present, keyed by name."""
-    candidates = (
-        ("math_data", math_data.database, database_path()),
-        ("sym_ob_small", sym_ob_small.database, _sym_ob_path()),
+def _candidates() -> tuple[tuple[str, Database, Path | None, str], ...]:
+    """The known databases: name, schema, file path if determined, and how to enable."""
+    return (
+        ("math_data", math_data.database, database_path(), "bundled with the package"),
+        (
+            "sym_ob_small",
+            sym_ob_small.database,
+            _sym_ob_path(),
+            "download https://www.andrej.com/tmp/sym-ob-small.db and point the "
+            "BRIDGE_MCP_SYM_OB_DB environment variable at it",
+        ),
     )
-    return {
-        name: (database, path)
-        for name, database, path in candidates
-        if path is not None and path.exists()
-    }
 
 
-DATABASES = _available()
+CANDIDATES = _candidates()
+
+DATABASES = {
+    name: (database, path)
+    for name, database, path, _ in CANDIDATES
+    if path is not None and path.exists()
+}
 
 _SUMMARY = """## Writing queries
 `query` takes: domains (e.g. [["g", "Graph8"]]); output, a mapping from each result
@@ -76,23 +83,42 @@ def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _build_instructions(schemas: dict[str, dict[str, Any]]) -> str:
-    default = next(iter(schemas), "")
+def _build_instructions() -> str:
+    default = next(iter(DATABASES), "")
     lines = [
-        f"Databases: {', '.join(schemas)}. `query` and `describe` take a `database` "
-        f"parameter selecting one (default: {default}); `describe` with no arguments "
-        "lists them.",
+        f"Databases: {', '.join(name for name, *_ in CANDIDATES)}. `query` and "
+        f"`describe` take a `database` parameter selecting one (default: {default}); "
+        "`describe` with no arguments lists them.",
         "",
     ]
-    for name, schema in schemas.items():
-        lines += _database_section(name, schema) + [""]
+    for name, selected, _, hint in CANDIDATES:
+        if name in DATABASES:
+            lines += _database_section(name, selected.describe()) + [""]
+        else:
+            lines += [
+                f"## Database `{name}` (not available)",
+                selected.overview,
+                f"To enable: {hint}.",
+                "",
+            ]
     lines.append(_SUMMARY)
     return "\n".join(lines)
 
 
-INSTRUCTIONS = _build_instructions(
-    {name: database.describe() for name, (database, _) in DATABASES.items()}
-)
+INSTRUCTIONS = _build_instructions()
+
+
+def _listing_entry(name: str, selected: Database, hint: str) -> dict[str, object]:
+    """One entry of the database listing: unavailable databases say how to enable."""
+    if name in DATABASES:
+        return {"name": name, "overview": selected.overview, "available": True}
+    else:
+        return {
+            "name": name,
+            "overview": selected.overview,
+            "available": False,
+            "enable": hint,
+        }
 
 
 def register(mcp: FastMCP) -> None:
@@ -152,10 +178,7 @@ def register(mcp: FastMCP) -> None:
         """
         if database is None:
             return {
-                "databases": [
-                    {"name": name, "overview": selected.overview}
-                    for name, (selected, _) in DATABASES.items()
-                ]
+                "databases": [_listing_entry(name, s, hint) for name, s, _, hint in CANDIDATES]
             }
         else:
             selected, _ = resolve(database)
