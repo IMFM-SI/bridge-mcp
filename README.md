@@ -69,16 +69,29 @@ them with these tools.
 
 ## Databases
 
+The `query` and `describe` tools take a `database` parameter naming the database to
+use; calling `describe` with no arguments lists the available databases.
+
 ### Small graphs
 
-The database holds every non-isomorphic simple graph on up to 8 vertices
-(13,598 in all), each annotated with a selection of invariants — among them the number of
-vertices and edges, the degree sequence, the chromatic number, and the automorphism
-count. Every invariant is both
+The bundled database `math_data` holds every non-isomorphic simple graph on up to 8
+vertices (13,598 in all), each annotated with a selection of invariants — among them
+the number of vertices and edges, the degree sequence, the chromatic number, and the
+automorphism count. Every invariant is both
 queryable in a condition and returnable in the output; the graph itself is stored in
 graph6 encoding. The single domain is `Graph8` — call the `describe` tool for the full
 field list. The database is generated with nauty and networkx
 (see `scripts/generate_graphs.py`).
+
+### Maniplexes
+
+An optional database `sym_ob_small` holds 32,634 regular rank-4 maniplexes together
+with their flag graphs, 1-skeleta, 1-coskeleta, and canonical labelings, connected by
+foreign keys: a `Maniplex` links to a `CanonicalLabeling`, which links to its `Graph`
+(stored in sparse6 encoding), so a query can follow a chain such as
+`m.skeleton.graph.sparse6`. The file (≈ 298 MB) is not bundled; download it from
+<https://www.andrej.com/tmp/sym-ob-small.db> and point the `BRIDGE_MCP_SYM_OB_DB`
+environment variable at it.
 
 ## Available tools
 

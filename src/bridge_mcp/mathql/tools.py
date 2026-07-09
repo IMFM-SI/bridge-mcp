@@ -1,33 +1,62 @@
-"""The mathql component: the `query`, `describe`, and `grammar` tools over a database."""
+"""The mathql component: the `query`, `describe`, and `grammar` tools over the databases."""
 
 from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sqlite3
 from importlib import resources
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.mathql.databases.math_data import database
+from bridge_mcp.mathql.database import Database
+from bridge_mcp.mathql.databases import math_data, sym_ob_small
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import database_path, run_query
+
+
+def _sym_ob_path() -> Path | None:
+    """The maniplex database's path from `BRIDGE_MCP_SYM_OB_DB`, if set."""
+    value = os.environ.get("BRIDGE_MCP_SYM_OB_DB")
+    if value is None:
+        return None
+    else:
+        return Path(value)
+
+
+def _available() -> dict[str, tuple[Database, Path]]:
+    """The databases whose files are present, keyed by name."""
+    candidates = (
+        ("math_data", math_data.database, database_path()),
+        ("sym_ob_small", sym_ob_small.database, _sym_ob_path()),
+    )
+    return {
+        name: (database, path)
+        for name, database, path in candidates
+        if path is not None and path.exists()
+    }
+
+
+DATABASES = _available()
 
 _SUMMARY = """## Writing queries
 `query` takes: domains (e.g. [["g", "Graph8"]]); output, a mapping from each result
 column name to the expression it returns (e.g. {"g6": "id(g)", "edges": "g.num_edges"});
 and optional condition, order ([expression, "asc"|"desc"] pairs, which may refer to the
-output column names), and limit. Expressions use fields (g.num_vertices), id(x) for an
-object's primary key, literals, arithmetic (+ - *), comparisons (== != < <= > >=),
-booleans (&& || !), and defined/undefined for absence; a comparison needs both sides the
-same type. String literals are single-quoted ('text', a literal quote doubled as '').
-ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the `grammar` tool for the
-full grammar."""
+output column names), limit, and database. Expressions use fields (g.num_vertices),
+id(x) for an object's primary key, literals, arithmetic (+ - *), comparisons
+(== != < <= > >=), booleans (&& || !), and defined/undefined for absence; a comparison
+needs both sides the same type. String literals are single-quoted ('text', a literal
+quote doubled as ''). ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the
+`grammar` tool for the full grammar."""
 
 
-def _build_instructions(schema: dict[str, Any]) -> str:
-    lines = [schema["overview"], "", "## Domains and fields"]
+def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
+    """The instruction lines for one database: overview, domains, two examples."""
+    lines = [f"## Database `{name}`", schema["overview"], "", "### Domains and fields"]
     for domain in schema["domains"]:
         lines.append(f"- {domain['name']}: {domain['doc']}")
         if domain["inputFields"]:
@@ -41,17 +70,42 @@ def _build_instructions(schema: dict[str, Any]) -> str:
             )
             for field in domain["domainFields"]:
                 lines.append(f"    {field['label']} → {field['domain']} — {field['doc']}")
-    lines += ["", _SUMMARY, "", "## Examples (call `describe` for the full list)"]
-    for example in schema["examples"][:3]:
+    lines += ["", "### Examples (call `describe` for the full list)"]
+    for example in schema["examples"][:2]:
         lines.append(f"- {example['note']}: {json.dumps(example['query'])}")
+    return lines
+
+
+def _build_instructions(schemas: dict[str, dict[str, Any]]) -> str:
+    default = next(iter(schemas), "")
+    lines = [
+        f"Databases: {', '.join(schemas)}. `query` and `describe` take a `database` "
+        f"parameter selecting one (default: {default}); `describe` with no arguments "
+        "lists them.",
+        "",
+    ]
+    for name, schema in schemas.items():
+        lines += _database_section(name, schema) + [""]
+    lines.append(_SUMMARY)
     return "\n".join(lines)
 
 
-INSTRUCTIONS = _build_instructions(database.describe())
+INSTRUCTIONS = _build_instructions(
+    {name: database.describe() for name, (database, _) in DATABASES.items()}
+)
 
 
 def register(mcp: FastMCP) -> None:
     """Register the query tools on `mcp`."""
+
+    default = next(iter(DATABASES), None)
+
+    def resolve(database: str | None) -> tuple[Database, Path]:
+        name = database if database is not None else default
+        if name is not None and name in DATABASES:
+            return DATABASES[name]
+        else:
+            raise ValueError(f"unknown database '{name}'; available: {', '.join(DATABASES)}")
 
     @mcp.tool()
     def query(
@@ -60,6 +114,7 @@ def register(mcp: FastMCP) -> None:
         condition: str | None = None,
         order: list[list[str]] | None = None,
         limit: int | None = None,
+        database: str | None = None,
     ) -> list[dict[str, object]]:
         """Run a MathQL query and return the matching rows.
 
@@ -70,7 +125,10 @@ def register(mcp: FastMCP) -> None:
         order: [expression, "asc"|"desc"] pairs; the expressions may refer to the
             output column names (optional).
         limit: maximum number of rows (optional).
+        database: which database to query (optional; call `describe` with no
+            arguments for the list, the first entry being the default).
         """
+        selected, path = resolve(database)
         request: dict[str, Any] = {"domains": domains, "output": output}
         if condition is not None:
             request["condition"] = condition
@@ -79,15 +137,29 @@ def register(mcp: FastMCP) -> None:
         if limit is not None:
             request["limit"] = limit
         try:
-            with contextlib.closing(sqlite3.connect(database_path())) as connection:
-                return run_query(connection, database, request)
+            with contextlib.closing(
+                sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            ) as connection:
+                return run_query(connection, selected, request)
         except MathQLError as error:
             raise ValueError(str(error)) from error
 
     @mcp.tool()
-    def describe() -> dict[str, object]:
-        """Return the database schema: domains, fields, constants, and examples."""
-        return database.describe()
+    def describe(database: str | None = None) -> dict[str, object]:
+        """Describe a database: its domains, fields, constants, and examples.
+
+        With no `database`, list the available databases and their overviews.
+        """
+        if database is None:
+            return {
+                "databases": [
+                    {"name": name, "overview": selected.overview}
+                    for name, (selected, _) in DATABASES.items()
+                ]
+            }
+        else:
+            selected, _ = resolve(database)
+            return selected.describe()
 
     @mcp.tool()
     def grammar() -> str:
