@@ -10,7 +10,7 @@ A query is a JSON object:
 ```
 {
   "domains":   [[variable, domain], ...],
-  "output":    [item, ...],
+  "output":    { name: "<expression>", ... },
   "condition": "<expression>",
   "order":     [["<expression>", "asc" | "desc"], ...],
   "limit":     <integer>
@@ -19,17 +19,31 @@ A query is a JSON object:
 
 - `domains` (required) binds one or more variables, each ranging over a named
   domain; several bindings form a join.
-- `output` (required) lists the values to return. An item is either a variable `x`,
-  which returns the whole object, or `x.field`, which returns a single field.
+- `output` (required) maps each result column name (a plain identifier) to the
+  expression whose value that column returns; the expressions use the same
+  grammar as `condition`. The output expressions are independent of one
+  another: one may not refer to another's column name.
 - `condition` (optional, default `true`) restricts the result to the objects, or
   tuples of objects, that satisfy it; it must have type `bool`.
 - `order` (optional) sorts the result by one or more scalar expressions, each
-  ascending or descending.
+  ascending or descending; an order expression may refer to the output columns
+  by name.
 - `limit` (optional) bounds the number of rows returned.
 
 ## Domains
 
-The available domains and their fields are obtained from the `describe` tool.
+A domain is a named collection of objects (a table). A variable bound to a domain
+denotes one object of it. An object has two kinds of field:
+
+- an *input field*, a scalar value (`int`, `bool`, `string`, or a list), written
+  `x.field`;
+- a *domain field*, a link to an object of another domain, also written `x.field`,
+  whose value is that object — which can itself be projected (`x.field.field2`) or
+  passed to `id`.
+
+Every object has a *primary key*, the tuple of its identifying input fields;
+`id(x)` returns it. The available domains, their input fields, and their domain
+fields are obtained from the `describe` tool.
 
 ## Types
 
@@ -54,7 +68,7 @@ Types are never written down in a query, but may appear in error messages.
 
 ## Expressions
 
-The condition and the order expressions are written in the following grammar. It is
+The output, condition, and order expressions are written in the following grammar. It is
 ambiguous as written, but the clauses are written in the order of precedence.
 Precedence and associativity are described in detail in *Precedence and associativity** below.
 
@@ -75,18 +89,25 @@ expr ::= "if" expr "then" expr "else" expr
        | "-" expr
        | "defined" expr
        | "undefined" expr
+       | "id" expr
        | expr "." integer
+       | expr "." field
        | integer
        | string
        | "true"
        | "false"
-       | variable "." field
+       | variable
+       | domain "[" expr "," … "," expr "]"
        | constant
        | "(" expr ")"
        | "(" expr "," … "," expr ")"
        | "[" "]"
        | "[" expr "," … "," expr "]"
 ```
+
+A `variable`, an `expr . field` on a domain field, and a `domain[…]` denote
+*objects*, not scalars; they appear only under `id` or as the head of a further
+projection. A query that returns or compares a bare object is ill-typed.
 
 The meaning and types of the above expressions is as follows:
 
@@ -102,13 +123,19 @@ The meaning and types of the above expressions is as follows:
 - `! e` — boolean negation; the operand and the result are `bool`.
 - `defined e` and `undefined e` — test whether `e` has a value or is absent; the
   result is `bool`.
+- `id e` — the primary key of the object `e`: for a single-column key, that
+  column's value; otherwise the tuple of its components.
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
 - `42` – integer literal of type `int`
-- `"text"` – string literal of type `string`
+- `'text'` – string literal of type `string`; a literal single quote is written by
+  doubling it (`'it''s'`).
 - `true` and `false` – truth values of type `bool`
-- `x.field` — the value of the field `field` of the variable `x`, of the field's
-  declared type (see `describe` tool).
+- `x` — a variable, denoting the object it is bound to.
+- `x.field` — the field `field` of the object `x`: an input field yields its scalar
+  value (of the field's declared type), a domain field yields the linked object
+  (see `describe` tool).
+- `D[e₁, …, eₙ]` — the object of domain `D` whose primary key is `(e₁, …, eₙ)`.
 - `c` — a named constant declared by the database, of its declared type (see `describe` tool)
 - `(e)` — grouping
 - `(e1, …, en)` — a tuple, of the corresponding product type.
@@ -127,4 +154,4 @@ accepted equivalents:
   `≤`, `≥`).
 - `+` `-`, addition and subtraction, left-associative.
 - `*`, multiplication, left-associative.
-- `!` (UTF-8 `¬`), unary `-`, `defined`, and `undefined`, the prefix operators.
+- `!` (UTF-8 `¬`), unary `-`, `defined`, `undefined`, and `id`, the prefix operators.

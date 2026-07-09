@@ -44,17 +44,18 @@ You need to restart Claude Desktop for the setting to take effect.
 
 MathQL is a small, typed query language for asking mathematical questions about
 collections of mathematical objects. A query names one or more *domains* of objects,
-gives a *condition* the objects must satisfy, and lists what to *return*. It is
-type-checked and compiled to SQL, then run against the database that holds the objects.
-Queries are submitted as JSON through the `query` tool; conditions and ordering are
-written in a familiar expression syntax — arithmetic, comparisons, `&&`/`||`/`!`,
-`defined`/`undefined`, and list and tuple literals. For example, the trees on five
-vertices:
+gives a *condition* the objects must satisfy, and maps each result column to the
+expression it *returns*. It is type-checked and compiled to SQL, then run against the
+database that holds the objects. Queries are submitted as JSON through the `query`
+tool; the output, condition, and ordering are written in a familiar expression syntax —
+fields (`g.num_edges`), `id(g)` for an object's primary key, arithmetic, comparisons,
+`&&`/`||`/`!`, `defined`/`undefined`, and list and tuple literals. For example, the
+trees on five vertices:
 
 ```json
 {
   "domains": [["g", "Graph8"]],
-  "output": ["g.graph6", "g.degree_sequence"],
+  "output": {"graph6": "g.graph6", "degree_sequence": "g.degree_sequence"},
   "condition": "g.num_vertices == 5 && g.is_tree"
 }
 ```
