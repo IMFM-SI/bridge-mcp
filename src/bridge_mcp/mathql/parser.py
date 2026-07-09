@@ -88,11 +88,11 @@ class _ToAst(Transformer[Token, input_ast.Expr]):
     def undefined(self, meta: Meta, expr: input_ast.Expr) -> input_ast.Undefined:
         return input_ast.Undefined(expr, _span(meta))
 
-    def call(self, meta: Meta, token: Token, argument: input_ast.Expr) -> input_ast.Id:
+    def id_call(self, meta: Meta, token: Token, argument: input_ast.Expr) -> input_ast.Id:
         if str(token) == "id":
             return input_ast.Id(argument, _span(meta))
         else:
-            raise MathQLError(f"unknown function '{token}'")
+            raise MathQLError(f"parse error: unexpected '(' after '{token}'")
 
     def proj(self, meta: Meta, obj: input_ast.Expr, index: Token) -> input_ast.Proj:
         return input_ast.Proj(obj, int(index), _span(meta))

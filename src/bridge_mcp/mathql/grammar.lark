@@ -47,7 +47,7 @@
      | "(" expr ("," expr)+ ")"       -> tuple_
      | IDENT "[" "]"                  -> obj_empty
      | IDENT "[" expr ("," expr)* "]" -> obj
-     | IDENT "(" expr ")"             -> call
+     | IDENT "(" expr ")"             -> id_call  // the IDENT must be "id"; a keyword token would reserve it
      | IDENT                          -> ident
 
 IDENT: /[a-zA-Z][a-zA-Z0-9_]*/
