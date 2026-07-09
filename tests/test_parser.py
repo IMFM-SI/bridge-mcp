@@ -21,11 +21,16 @@ def test_atoms() -> None:
 
 def test_id_and_obj() -> None:
     assert p("id(g)") == ast.Id(ast.Ident("g"))
-    assert p("id g.link") == ast.Id(ast.Field(ast.Ident("g"), "link"))
+    assert p("id(g.link)") == ast.Id(ast.Field(ast.Ident("g"), "link"))
+    assert p("id(g).0") == ast.Proj(ast.Id(ast.Ident("g")), 0)
+    assert p("id") == ast.Ident("id")  # a plain identifier, e.g. an output column
+    assert p("g.id") == ast.Field(ast.Ident("g"), "id")
     assert p("Graph['abc']") == ast.Obj("Graph", (ast.StrLit("abc"),))
     assert p("Pair[1, 2]") == ast.Obj("Pair", (ast.IntLit(1), ast.IntLit(2)))
     assert p("Unit[]") == ast.Obj("Unit", ())
     assert p("Graph['abc'].n") == ast.Field(ast.Obj("Graph", (ast.StrLit("abc"),)), "n")
+    with pytest.raises(MathQLError):
+        p("foo(3)")  # id is the only known function
 
 
 def test_field_chains() -> None:

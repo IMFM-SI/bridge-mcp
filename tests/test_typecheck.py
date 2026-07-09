@@ -84,6 +84,7 @@ def test_outputs_are_independent() -> None:
 def test_order_sees_output_aliases() -> None:
     assert _elaborates([("m", "g.n * g.n")], "g.planar", [("m", Direction.DESC)])
     assert _elaborates([("m", "g.n")], "true", [("m + 1", Direction.ASC)])
+    assert _elaborates([("id", "g.n")], "true", [("id", Direction.DESC)])  # id is ordinary
     assert not _elaborates([("m", "g.n")], "m > 0")  # but the condition does not
 
 

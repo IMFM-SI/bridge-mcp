@@ -29,7 +29,6 @@
 
 ?unary_expr: "defined" unary_expr   -> defined
            | "undefined" unary_expr -> undefined
-           | "id" unary_expr        -> id_
            | ("!"|"¬") unary_expr   -> not_
            | "-" unary_expr         -> neg
            | postfix_expr
@@ -48,6 +47,7 @@
      | "(" expr ("," expr)+ ")"       -> tuple_
      | IDENT "[" "]"                  -> obj_empty
      | IDENT "[" expr ("," expr)* "]" -> obj
+     | IDENT "(" expr ")"             -> call
      | IDENT                          -> ident
 
 IDENT: /[a-zA-Z][a-zA-Z0-9_]*/

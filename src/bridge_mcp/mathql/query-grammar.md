@@ -89,7 +89,6 @@ expr ::= "if" expr "then" expr "else" expr
        | "-" expr
        | "defined" expr
        | "undefined" expr
-       | "id" expr
        | expr "." integer
        | expr "." field
        | integer
@@ -98,6 +97,7 @@ expr ::= "if" expr "then" expr "else" expr
        | "false"
        | variable
        | domain "[" expr "," … "," expr "]"
+       | "id" "(" expr ")"
        | constant
        | "(" expr ")"
        | "(" expr "," … "," expr ")"
@@ -123,7 +123,7 @@ The meaning and types of the above expressions is as follows:
 - `! e` — boolean negation; the operand and the result are `bool`.
 - `defined e` and `undefined e` — test whether `e` has a value or is absent; the
   result is `bool`.
-- `id e` — the primary key of the object `e`: for a single-column key, that
+- `id(e)` — the primary key of the object `e`: for a single-column key, that
   column's value; otherwise the tuple of its components.
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
@@ -154,4 +154,4 @@ accepted equivalents:
   `≤`, `≥`).
 - `+` `-`, addition and subtraction, left-associative.
 - `*`, multiplication, left-associative.
-- `!` (UTF-8 `¬`), unary `-`, `defined`, `undefined`, and `id`, the prefix operators.
+- `!` (UTF-8 `¬`), unary `-`, `defined`, and `undefined`, the prefix operators.
