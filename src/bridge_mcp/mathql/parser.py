@@ -1,6 +1,6 @@
-"""Parse MathQL expressions into the input AST, via the Lark grammar."""
+"""Parse MathQL expressions and identifiers into the input AST, via the Lark grammar."""
 
-import json
+import re
 from importlib import resources
 
 from lark import Lark, Token, Transformer, v_args
@@ -14,6 +14,18 @@ from bridge_mcp.mathql.operators import BinaryOp, ComparisonOp, UnaryOp
 _GRAMMAR = (
     resources.files("bridge_mcp.mathql").joinpath("grammar.lark").read_text(encoding="utf-8")
 )
+
+KEYWORDS = frozenset({"if", "then", "else", "in", "true", "false", "defined", "undefined"})
+
+_IDENTIFIER = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*")
+
+
+def _name(token: Token) -> str:
+    """The token's text as an identifier that is not a keyword."""
+    if str(token) in KEYWORDS:
+        raise MathQLError(f"unexpected keyword '{token}'")
+    else:
+        return str(token)
 
 
 def _span(meta: Meta) -> input_ast.Span | None:
@@ -76,13 +88,14 @@ class _ToAst(Transformer[Token, input_ast.Expr]):
     def undefined(self, meta: Meta, expr: input_ast.Expr) -> input_ast.Undefined:
         return input_ast.Undefined(expr, _span(meta))
 
+    def id_(self, meta: Meta, expr: input_ast.Expr) -> input_ast.Id:
+        return input_ast.Id(expr, _span(meta))
+
     def proj(self, meta: Meta, obj: input_ast.Expr, index: Token) -> input_ast.Proj:
         return input_ast.Proj(obj, int(index), _span(meta))
 
     def field(self, meta: Meta, obj: input_ast.Expr, label: Token) -> input_ast.Field:
-        if isinstance(obj, input_ast.Const):
-            return input_ast.Field(obj.name, str(label), _span(meta))
-        raise MathQLError("field access requires a variable, for example x.label")
+        return input_ast.Field(obj, _name(label), _span(meta))
 
     def int_(self, meta: Meta, token: Token) -> input_ast.IntLit:
         return input_ast.IntLit(int(token), _span(meta))
@@ -94,14 +107,16 @@ class _ToAst(Transformer[Token, input_ast.Expr]):
         return input_ast.BoolLit(False, _span(meta))
 
     def str_(self, meta: Meta, token: Token) -> input_ast.StrLit:
-        try:
-            value = json.loads(str(token))
-        except json.JSONDecodeError as exc:
-            raise MathQLError(f"invalid string literal {token}") from exc
-        return input_ast.StrLit(value, _span(meta))
+        return input_ast.StrLit(str(token)[1:-1].replace("''", "'"), _span(meta))
 
-    def const(self, meta: Meta, token: Token) -> input_ast.Const:
-        return input_ast.Const(str(token), _span(meta))
+    def ident(self, meta: Meta, token: Token) -> input_ast.Ident:
+        return input_ast.Ident(_name(token), _span(meta))
+
+    def obj_empty(self, meta: Meta, token: Token) -> input_ast.Obj:
+        return input_ast.Obj(_name(token), (), _span(meta))
+
+    def obj(self, meta: Meta, token: Token, *args: input_ast.Expr) -> input_ast.Obj:
+        return input_ast.Obj(_name(token), args, _span(meta))
 
     def empty_list(self, meta: Meta) -> input_ast.ListExpr:
         return input_ast.ListExpr((), _span(meta))
@@ -128,3 +143,13 @@ def parse_expression(text: str) -> input_ast.Expr:
         raise
     except LarkError as exc:
         raise MathQLError(f"parse error: {exc}") from exc
+
+
+def parse_identifier(text: str) -> str:
+    """Parse a single identifier. Raises `MathQLError` on malformed input."""
+    if _IDENTIFIER.fullmatch(text) is None:
+        raise MathQLError(f"invalid identifier '{text}'")
+    elif text in KEYWORDS:
+        raise MathQLError(f"unexpected keyword '{text}'")
+    else:
+        return text

@@ -26,11 +26,11 @@ def test_triangle(connection: sqlite3.Connection) -> None:
         database,
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6", "g.num_edges"],
+            "output": {"graph6": "g.graph6", "num_edges": "g.num_edges"},
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
     )
-    assert rows == [{"g.graph6": "Bw", "g.num_edges": 3}]
+    assert rows == [{"graph6": "Bw", "num_edges": 3}]
 
 
 def test_trees_on_five(connection: sqlite3.Connection) -> None:
@@ -39,7 +39,7 @@ def test_trees_on_five(connection: sqlite3.Connection) -> None:
         database,
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6"],
+            "output": {"graph6": "g.graph6"},
             "condition": "g.num_vertices == 5 && g.is_tree",
         },
     )
@@ -52,23 +52,49 @@ def test_degree_sequence_equality(connection: sqlite3.Connection) -> None:
         database,
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6"],
+            "output": {"graph6": "g.graph6", "degrees": "g.degree_sequence"},
             "condition": "g.degree_sequence == [2, 2, 2]",
         },
     )
-    assert rows == [{"g.graph6": "Bw"}]
+    assert rows == [{"graph6": "Bw", "degrees": [2, 2, 2]}]
 
 
-def test_whole_object(connection: sqlite3.Connection) -> None:
+def test_id_output(connection: sqlite3.Connection) -> None:
     rows = run_query(
         connection,
         database,
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g"],
+            "output": {"gid": "id(g)"},
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
     )
-    assert rows[0]["g"]["degree_sequence"] == [2, 2, 2]
-    assert rows[0]["g"]["is_connected"] is True
-    assert rows[0]["g"]["diameter"] == 1
+    assert rows == [{"gid": "Bw"}]
+
+
+def test_null_becomes_none(connection: sqlite3.Connection) -> None:
+    rows = run_query(
+        connection,
+        database,
+        {
+            "domains": [["g", "Graph8"]],
+            "output": {"diameter": "g.diameter"},
+            "condition": "!g.is_connected && g.num_vertices == 2",
+        },
+    )
+    assert rows == [{"diameter": None}]
+
+
+def test_order_by_alias(connection: sqlite3.Connection) -> None:
+    rows = run_query(
+        connection,
+        database,
+        {
+            "domains": [["g", "Graph8"]],
+            "output": {"g6": "id(g)", "spread": "g.max_degree - g.min_degree"},
+            "condition": "g.num_vertices == 5",
+            "order": [["spread", "desc"]],
+            "limit": 3,
+        },
+    )
+    assert [row["spread"] for row in rows] == [3, 3, 3]

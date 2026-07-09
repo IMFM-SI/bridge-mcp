@@ -40,14 +40,31 @@ class StrLit:
 
 
 @dataclass(frozen=True)
-class Const:
+class Ident:
     name: str
     span: Span | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
+class Id:
+    """The primary key of the object denoted by `expr`."""
+
+    expr: Expr
+    span: Span | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True)
+class Obj:
+    """The object of `domain` with the given primary key, `D[e1, ..., en]`."""
+
+    domain: str
+    args: tuple[Expr, ...]
+    span: Span | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True)
 class Field:
-    var: str
+    expr: Expr
     label: str
     span: Span | None = field(default=None, compare=False)
 
@@ -118,7 +135,9 @@ Expr = (
     IntLit
     | BoolLit
     | StrLit
-    | Const
+    | Ident
+    | Id
+    | Obj
     | Field
     | Proj
     | ListExpr
@@ -130,14 +149,6 @@ Expr = (
     | Defined
     | Undefined
 )
-
-
-@dataclass(frozen=True)
-class OutputItem:
-    """A domain variable `x` (the whole object), or a field projection `x.label`."""
-
-    var: str
-    field: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,7 +171,7 @@ class Query:
     type-checker fills in `true`, the empty list, and none respectively."""
 
     domains: tuple[Binding, ...]
-    output: tuple[OutputItem, ...]
+    output: tuple[tuple[str, Expr], ...]
     condition: Expr | None = None
     order: tuple[OrderEntry, ...] | None = None
     limit: int | None = None

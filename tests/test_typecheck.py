@@ -1,64 +1,111 @@
 """Type-checking guards, ported from the Lean Test.lean."""
 
+import pytest
+
 from bridge_mcp.mathql import input as ast
-from bridge_mcp.mathql.context import Context, DomainSignature
+from bridge_mcp.mathql.context import Context, DomainTy, InputField
 from bridge_mcp.mathql.errors import MathQLError
+from bridge_mcp.mathql.operators import Direction
 from bridge_mcp.mathql.parser import parse_expression
 from bridge_mcp.mathql.typecheck import check_query, infer
-from bridge_mcp.mathql.types import BoolType, IntType
+from bridge_mcp.mathql.types import BoolType, IntType, StringType
 
-GRAPH = DomainSignature(
-    input_fields={"n": IntType(), "planar": BoolType()},
-    output_fields=frozenset({"n"}),
+GRAPH = DomainTy(
+    input_fields={
+        "graph6": InputField(StringType(), True),
+        "n": InputField(IntType(), False),
+        "planar": InputField(BoolType(), False),
+    },
+    domain_fields={},
 )
-TOY = Context(domains={"Graph": GRAPH})
+MANIPLEX = DomainTy(
+    input_fields={"mid": InputField(IntType(), True), "size": InputField(IntType(), False)},
+    domain_fields={"skeleton": "Graph"},
+)
+TOY = Context(domains={"Graph": GRAPH, "Maniplex": MANIPLEX})
 
 
-def _item(text: str) -> ast.OutputItem:
-    var, _, label = text.partition(".")
-    return ast.OutputItem(var, label or None)
-
-
-def _query(output: list[str], condition: str) -> ast.Query:
+def _query(
+    output: list[tuple[str, str]],
+    condition: str,
+    order: list[tuple[str, Direction]] | None = None,
+) -> ast.Query:
     return ast.Query(
         domains=(ast.Binding("g", "Graph"), ast.Binding("h", "Graph")),
-        output=tuple(_item(o) for o in output),
+        output=tuple((name, parse_expression(e)) for name, e in output),
         condition=parse_expression(condition),
+        order=(
+            tuple(ast.OrderEntry(parse_expression(e), d) for e, d in order)
+            if order is not None
+            else None
+        ),
     )
 
 
-def _elaborates(output: list[str], condition: str) -> bool:
+def _elaborates(
+    output: list[tuple[str, str]],
+    condition: str,
+    order: list[tuple[str, Direction]] | None = None,
+) -> bool:
     try:
-        check_query(TOY, _query(output, condition))
+        check_query(TOY, _query(output, condition, order))
     except MathQLError:
         return False
     return True
 
 
 def test_well_typed() -> None:
-    assert _elaborates(["g.n"], "g.planar")
-    assert _elaborates(["g.n"], "g.n > 3")
-    assert _elaborates(["g.n", "g.n"], "true")
-    assert _elaborates(["g.n", "h.n"], "g.n = h.n")
-    assert _elaborates(["g.n"], "defined g.n")
-    assert _elaborates(["g.n"], "undefined g.planar || g.n > 0")
+    assert _elaborates([("n", "g.n")], "g.planar")
+    assert _elaborates([("n", "g.n")], "g.n > 3")
+    assert _elaborates([("a", "g.n"), ("b", "g.n")], "true")
+    assert _elaborates([("a", "g.n"), ("b", "h.n")], "g.n = h.n")
+    assert _elaborates([("n", "g.n")], "defined g.n")
+    assert _elaborates([("n", "g.n")], "undefined g.planar || g.n > 0")
+
+
+def test_id_and_obj() -> None:
+    assert _elaborates([("gid", "id(g)")], "id(g) == 'abc'")
+    assert _elaborates([("m", "Graph['abc'].n")], "Graph['abc'].n > 3")
+    assert not _elaborates([("n", "g.n")], "id(g) == 3")  # id is string, not int
+    assert not _elaborates([("g", "g")], "true")  # a bare object is not an expression
+    assert not _elaborates([("n", "g.n")], "Graph[].n > 3")  # wrong number of key parts
 
 
 def test_ill_typed() -> None:
-    assert not _elaborates(["g.n"], "g.n")  # condition is int, not bool
-    assert not _elaborates(["g.bogus"], "g.planar")  # unknown output field
-    assert not _elaborates(["g.n"], "g.planar + 1")  # bool in arithmetic
+    assert not _elaborates([("n", "g.n")], "g.n")  # condition is int, not bool
+    assert not _elaborates([("b", "g.bogus")], "g.planar")  # unknown field
+    assert not _elaborates([("n", "g.n")], "g.planar + 1")  # bool in arithmetic
+
+
+def test_outputs_are_independent() -> None:
+    assert not _elaborates([("m", "g.n"), ("k", "m + 1")], "true")
+
+
+def test_order_sees_output_aliases() -> None:
+    assert _elaborates([("m", "g.n * g.n")], "g.planar", [("m", Direction.DESC)])
+    assert _elaborates([("m", "g.n")], "true", [("m + 1", Direction.ASC)])
+    assert not _elaborates([("m", "g.n")], "m > 0")  # but the condition does not
+
+
+def test_domain_fields() -> None:
+    ctx = TOY.extend_domain_ident("m", "Maniplex")
+    int_ty, _ = infer(ctx, parse_expression("m.skeleton.n"))
+    assert int_ty == IntType()
+    string_ty, _ = infer(ctx, parse_expression("id(m.skeleton)"))
+    assert string_ty == StringType()
+    with pytest.raises(MathQLError):
+        infer(ctx, parse_expression("m.skeleton"))  # a bare object
 
 
 def test_lists_and_tuples() -> None:
-    assert _elaborates(["g.n"], "[g.n, g.n] == [1, 2]")
-    assert _elaborates(["g.n"], "(g.n, g.planar) == (1, true)")
-    assert _elaborates(["g.n"], "(g.n, g.planar).0 == g.n")
-    assert not _elaborates(["g.n"], "(g.n, g.planar) == (g.n, g.n)")  # product types differ
+    assert _elaborates([("n", "g.n")], "[g.n, g.n] == [1, 2]")
+    assert _elaborates([("n", "g.n")], "(g.n, g.planar) == (1, true)")
+    assert _elaborates([("n", "g.n")], "(g.n, g.planar).0 == g.n")
+    assert not _elaborates([("n", "g.n")], "(g.n, g.planar) == (g.n, g.n)")  # types differ
 
 
 def test_infer_directly() -> None:
-    ctx = TOY.with_variables({"g": GRAPH})
+    ctx = TOY.extend_domain_ident("g", "Graph")
     int_ty, _ = infer(ctx, parse_expression("g.n + 1"))
     assert int_ty == IntType()
     bool_ty, _ = infer(ctx, parse_expression("g.planar && g.n > 0"))

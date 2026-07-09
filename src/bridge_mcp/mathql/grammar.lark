@@ -29,6 +29,7 @@
 
 ?unary_expr: "defined" unary_expr   -> defined
            | "undefined" unary_expr -> undefined
+           | "id" unary_expr        -> id_
            | ("!"|"¬") unary_expr   -> not_
            | "-" unary_expr         -> neg
            | postfix_expr
@@ -37,19 +38,21 @@
              | postfix_expr "." IDENT -> field
              | atom
 
-?atom: INT                       -> int_
-     | "true"                    -> true_
-     | "false"                   -> false_
-     | STRING                    -> str_
-     | "[" "]"                   -> empty_list
-     | "[" expr ("," expr)* "]"  -> list_
+?atom: INT                            -> int_
+     | "true"                         -> true_
+     | "false"                        -> false_
+     | STRING                         -> str_
+     | "[" "]"                        -> empty_list
+     | "[" expr ("," expr)* "]"       -> list_
      | "(" expr ")"
-     | "(" expr ("," expr)+ ")"  -> tuple_
-     | IDENT                     -> const
+     | "(" expr ("," expr)+ ")"       -> tuple_
+     | IDENT "[" "]"                  -> obj_empty
+     | IDENT "[" expr ("," expr)* "]" -> obj
+     | IDENT                          -> ident
 
-IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
+IDENT: /[a-zA-Z][a-zA-Z0-9_]*/
 INT: /[0-9]+/
-STRING: /"(?:[^"\\]|\\.)*"/
+STRING: /'(?:[^']|'')*'/
 
 %import common.WS
 %ignore WS

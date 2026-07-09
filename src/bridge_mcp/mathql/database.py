@@ -1,43 +1,57 @@
-"""The database abstraction: domains, their fields and codecs, and the schema."""
+"""The database: how domains, their fields, and the constants map to SQLite."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 
 from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.context import Context, DomainSignature
+from bridge_mcp.mathql.context import Context, DomainTy, Entry, InputField, TypeEntry
+from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.types import Ty
 from bridge_mcp.mathql.types import render as render_type
 
 
 @dataclass(frozen=True)
-class Field:
-    """A field: its query-language label, the SQL column, its type, a codec, and a doc.
+class Column:
+    """A scalar field: the backing column, its type, whether it is part of the primary
+    key, and a human description."""
 
-    Every field is both queryable (in a condition) and returnable (in the output).
-    """
-
-    label: str
     column: str
     ty: Ty
+    is_primary: bool
     doc: str
-    codec: Callable[[Any], object]
 
 
 @dataclass(frozen=True)
-class Domain:
-    table: str
-    fields: tuple[Field, ...]
+class ForeignKey:
+    """A domain-valued field: the domain it links to, the matching column pairs
+    (this table's column, the foreign table's column), and a human description."""
+
+    domain: str
+    columns: tuple[tuple[str, str], ...]
     doc: str
 
-    def decode(self, cells: Sequence[Any]) -> dict[str, object]:
-        """Decode this domain's slice of a result row into {label: value}."""
-        return {
-            field.label: field.codec(cell)
-            for field, cell in zip(self.fields, cells, strict=True)
-        }
+
+@dataclass(frozen=True)
+class Schema:
+    """A domain's realization: the table, the scalar fields and foreign keys each keyed
+    by label, and a human description."""
+
+    table: str
+    columns: Mapping[str, Column]
+    foreign_keys: Mapping[str, ForeignKey]
+    doc: str
+
+    def primary_columns(self) -> tuple[str, ...]:
+        return tuple(c.column for c in self.columns.values() if c.is_primary)
+
+    def get_foreign_key(self, label: str) -> ForeignKey:
+        match self.foreign_keys.get(label):
+            case None:
+                raise MathQLError(f"unknown foreign key {label}")
+            case foreign_key:
+                return foreign_key
 
 
 @dataclass(frozen=True)
@@ -57,37 +71,44 @@ class Example:
 class Database:
     overview: str
     constants: tuple[Constant, ...]
-    domains: Mapping[str, Domain]
+    domains: Mapping[str, Schema]
     examples: tuple[Example, ...]
 
-    def typing_context(self) -> Context:
-        signatures = {
-            name: DomainSignature(
-                input_fields={field.label: field.ty for field in domain.fields},
-                output_fields=frozenset(field.label for field in domain.fields),
+    def domain_context(self) -> dict[str, DomainTy]:
+        return {
+            name: DomainTy(
+                input_fields={
+                    label: InputField(c.ty, c.is_primary)
+                    for label, c in schema.columns.items()
+                },
+                domain_fields={label: fk.domain for label, fk in schema.foreign_keys.items()},
             )
-            for name, domain in self.domains.items()
+            for name, schema in self.domains.items()
         }
-        return Context(domains=signatures, constants={c.name: c.ty for c in self.constants})
 
-    def sql_constants(self) -> dict[str, sql.Expr]:
-        return {c.name: c.sql for c in self.constants}
+    def context(self) -> Context:
+        idents: dict[str, Entry] = {c.name: TypeEntry(c.ty) for c in self.constants}
+        return Context(domains=self.domain_context(), idents=idents)
 
     def describe(self) -> dict[str, object]:
-        """The schema as JSON: overview, domains with fields, constants, and examples."""
+        """The schema as JSON: the overview, each domain with its input and domain
+        fields, the constants, and the example queries."""
         return {
             "overview": self.overview,
             "domains": [
                 {
                     "name": name,
-                    "doc": domain.doc,
-                    "fields": [
-                        {"label": field.label, "type": render_type(field.ty), "doc": field.doc}
-                        for field in domain.fields
+                    "doc": schema.doc,
+                    "inputFields": [
+                        {"label": label, "type": render_type(c.ty), "doc": c.doc}
+                        for label, c in schema.columns.items()
                     ],
-                    "output": [field.label for field in domain.fields],
+                    "domainFields": [
+                        {"label": label, "domain": fk.domain, "doc": fk.doc}
+                        for label, fk in schema.foreign_keys.items()
+                    ],
                 }
-                for name, domain in self.domains.items()
+                for name, schema in self.domains.items()
             ],
             "constants": [{"name": c.name, "type": render_type(c.ty)} for c in self.constants],
             "examples": [{"note": e.note, "query": e.query} for e in self.examples],

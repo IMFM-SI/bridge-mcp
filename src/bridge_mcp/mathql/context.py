@@ -1,42 +1,109 @@
-"""The typing context: the domains available, the variables bound, and the constants."""
+"""The typing context: the domains available and the identifiers in scope."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
+from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.types import Ty
 
 
 @dataclass(frozen=True)
-class DomainSignature:
-    """A domain's typing view: its queryable fields and its output-field labels."""
+class InputField:
+    """A scalar field: its type and whether it is part of the primary key."""
 
-    input_fields: Mapping[str, Ty]
-    output_fields: frozenset[str]
+    ty: Ty
+    is_primary: bool
+
+
+@dataclass(frozen=True)
+class DomainTy:
+    """The typing view of a domain: its scalar fields and its links to other domains."""
+
+    input_fields: Mapping[str, InputField]
+    domain_fields: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class TypeEntry:
+    """An identifier denoting a value: a constant or an output alias."""
+
+    ty: Ty
+
+
+@dataclass(frozen=True)
+class DomainEntry:
+    """An identifier denoting an object: a domain variable."""
+
+    domain: str
+
+
+Entry = TypeEntry | DomainEntry
 
 
 @dataclass(frozen=True)
 class Context:
-    """Which domains are available, which variables are bound, and the constants."""
+    """The domains available and the entry of each identifier in scope."""
 
-    domains: Mapping[str, DomainSignature]
-    variables: Mapping[str, DomainSignature] = field(default_factory=dict)
-    constants: Mapping[str, Ty] = field(default_factory=dict)
+    domains: Mapping[str, DomainTy]
+    idents: Mapping[str, Entry] = field(default_factory=dict)
 
-    def with_variables(self, additions: Mapping[str, DomainSignature]) -> Context:
-        return replace(self, variables={**self.variables, **additions})
+    def get_ident(self, name: str) -> Ty:
+        match self.idents.get(name):
+            case TypeEntry(ty):
+                return ty
+            case DomainEntry():
+                raise MathQLError(f"{name} is a domain but a constant was expected")
+            case None:
+                raise MathQLError(f"unknown identifier {name}")
 
-    def lookup_variable(self, var: str) -> DomainSignature | None:
-        return self.variables.get(var)
+    def get_domain_ident(self, name: str) -> str:
+        match self.idents.get(name):
+            case DomainEntry(domain):
+                return domain
+            case TypeEntry():
+                raise MathQLError(f"{name} is a constant but a domain was expected")
+            case None:
+                raise MathQLError(f"unknown domain name {name}")
 
-    def lookup_constant(self, name: str) -> Ty | None:
-        return self.constants.get(name)
+    def get_domain(self, domain: str) -> DomainTy:
+        match self.domains.get(domain):
+            case None:
+                raise MathQLError(f"unknown domain {domain}")
+            case domain_ty:
+                return domain_ty
 
-    def lookup_input_field(self, var: str, label: str) -> Ty | None:
-        signature = self.variables.get(var)
-        return signature.input_fields.get(label) if signature is not None else None
+    def get_primary_key(self, domain: str) -> tuple[tuple[str, Ty], ...]:
+        """The labels and types of the domain's primary-key fields, in field order."""
+        return tuple(
+            (label, input_field.ty)
+            for label, input_field in self.get_domain(domain).input_fields.items()
+            if input_field.is_primary
+        )
 
-    def is_output_field(self, var: str, label: str) -> bool:
-        signature = self.variables.get(var)
-        return signature is not None and label in signature.output_fields
+    def get_id_types(self, domain: str) -> tuple[Ty, ...]:
+        return tuple(ty for _, ty in self.get_primary_key(domain))
+
+    def get_input_field(self, domain: str, label: str) -> InputField:
+        match self.get_domain(domain).input_fields.get(label):
+            case None:
+                raise MathQLError(f"domain {domain} does not have a field {label}")
+            case input_field:
+                return input_field
+
+    def get_domain_field(self, domain: str, label: str) -> str:
+        match self.get_domain(domain).domain_fields.get(label):
+            case None:
+                raise MathQLError(f"domain {domain} does not have a field {label}")
+            case linked:
+                return linked
+
+    def get_input_field_ty(self, domain: str, label: str) -> Ty:
+        return self.get_input_field(domain, label).ty
+
+    def extend_ident(self, name: str, ty: Ty) -> Context:
+        return replace(self, idents={**self.idents, name: TypeEntry(ty)})
+
+    def extend_domain_ident(self, name: str, domain: str) -> Context:
+        return replace(self, idents={**self.idents, name: DomainEntry(domain)})

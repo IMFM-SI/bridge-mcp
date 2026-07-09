@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from bridge_mcp.mathql import expr
 from bridge_mcp.mathql.operators import Direction
+from bridge_mcp.mathql.types import Ty
 
 
 @dataclass(frozen=True)
@@ -17,11 +18,12 @@ class Binding:
 
 
 @dataclass(frozen=True)
-class OutputItem:
-    """A variable `x` (whole object, `label` is None) or a field projection `x.label`."""
+class OutputColumn:
+    """A result column: its name, its type, and the expression it returns."""
 
-    var: str
-    label: str | None
+    name: str
+    ty: Ty
+    expr: expr.Expr
 
 
 @dataclass(frozen=True)
@@ -33,7 +35,7 @@ class OrderEntry:
 @dataclass(frozen=True)
 class Query:
     variables: tuple[Binding, ...]
-    output: tuple[OutputItem, ...]
+    output: tuple[OutputColumn, ...]
     condition: expr.Expr
     order: tuple[OrderEntry, ...]
     limit: int | None

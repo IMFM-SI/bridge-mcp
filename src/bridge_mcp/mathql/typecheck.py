@@ -1,13 +1,15 @@
 """Bidirectional type-checking: elaborate the input AST into the typed AST.
 
-`infer` synthesizes a type, `check` checks against an expected one; `check_query`
-type-checks a whole query. Ill-typed input raises `MathQLError`, located by the offending
-node's source span.
+`infer` synthesizes a type, `check` checks against an expected one; `infer_domain`
+elaborates an object-denoting expression; `check_query` type-checks a whole query.
+Ill-typed input raises `MathQLError`, located by the offending node's source span.
 """
 
 from __future__ import annotations
 
-from typing import assert_never
+import functools
+from collections.abc import Callable
+from typing import TypeVar, assert_never
 
 from bridge_mcp.mathql import expr, query
 from bridge_mcp.mathql import input as input_ast
@@ -21,15 +23,27 @@ from bridge_mcp.mathql.types import (
     StringType,
     Ty,
     binary_type,
+    product_of,
     render,
     unary_type,
 )
+
+_T = TypeVar("_T")
 
 
 def _error(message: str, node: input_ast.Expr) -> MathQLError:
     if node.span is None:
         return MathQLError(message)
-    return MathQLError(f"{message} (line {node.span.line}, column {node.span.column})")
+    else:
+        return MathQLError(f"{message} (line {node.span.line}, column {node.span.column})")
+
+
+def _at(node: input_ast.Expr, lookup: Callable[[], _T]) -> _T:
+    """Run a context lookup, locating any error at `node`."""
+    try:
+        return lookup()
+    except MathQLError as error:
+        raise _error(str(error), node) from None
 
 
 def infer(ctx: Context, e: input_ast.Expr) -> tuple[Ty, expr.Expr]:
@@ -41,16 +55,20 @@ def infer(ctx: Context, e: input_ast.Expr) -> tuple[Ty, expr.Expr]:
             return BoolType(), expr.BoolLit(value)
         case input_ast.StrLit(value):
             return StringType(), expr.StrLit(value)
-        case input_ast.Const(name):
-            ty = ctx.lookup_constant(name)
-            if ty is None:
-                raise _error(f"unbound constant '{name}'", e)
-            return ty, expr.Const(name)
-        case input_ast.Field(var, label):
-            ty = ctx.lookup_input_field(var, label)
-            if ty is None:
-                raise _error(f"{var} does not have field '{label}'", e)
-            return ty, expr.Field(var, label)
+        case input_ast.Ident(name):
+            return _at(e, lambda: ctx.get_ident(name)), expr.Ident(name)
+        case input_ast.Id(operand):
+            domain, typed_domain = infer_domain(ctx, operand)
+            return (
+                product_of(_at(e, lambda: ctx.get_id_types(domain))),
+                expr.Id(typed_domain),
+            )
+        case input_ast.Obj():
+            raise _error("a bare object cannot appear in an expression", e)
+        case input_ast.Field(operand, label):
+            domain, typed_domain = infer_domain(ctx, operand)
+            ty = _at(e, lambda: ctx.get_input_field_ty(domain, label))
+            return ty, expr.Field(typed_domain, label)
         case input_ast.Proj(obj, index):
             obj_ty, typed_obj = infer(ctx, obj)
             match obj_ty:
@@ -79,7 +97,7 @@ def infer(ctx: Context, e: input_ast.Expr) -> tuple[Ty, expr.Expr]:
             return BoolType(), expr.Undefined(typed)
         case input_ast.ListExpr(items):
             if not items:
-                raise _error("cannot infer the type of an empty list", e)
+                raise _error("cannot infer the type of this empty list", e)
             element_ty, first = infer(ctx, items[0])
             rest = tuple(check(ctx, item, element_ty) for item in items[1:])
             return ListType(element_ty), expr.ListExpr((first, *rest))
@@ -95,6 +113,35 @@ def infer(ctx: Context, e: input_ast.Expr) -> tuple[Ty, expr.Expr]:
     assert_never(e)
 
 
+def infer_domain(ctx: Context, e: input_ast.Expr) -> tuple[str, expr.Domain]:
+    """Infer the domain of an object-denoting expression, elaborating it."""
+    match e:
+        case input_ast.Ident(name):
+            return _at(e, lambda: ctx.get_domain_ident(name)), expr.DomainIdent(name)
+        case input_ast.Obj(domain, args):
+            id_types = _at(e, lambda: ctx.get_id_types(domain))
+            return domain, expr.Obj(domain, _check_tuple(ctx, e, args, id_types))
+        case input_ast.Field(operand, label):
+            head, typed = infer_domain(ctx, operand)
+            linked = _at(e, lambda: ctx.get_domain_field(head, label))
+            return linked, expr.DomainField(typed, label)
+        case _:
+            raise _error("invalid expression in a field projection", e)
+
+
+def _check_tuple(
+    ctx: Context,
+    node: input_ast.Expr,
+    items: tuple[input_ast.Expr, ...],
+    factors: tuple[Ty, ...],
+) -> tuple[expr.Expr, ...]:
+    """Check a tuple's components against the product's component types."""
+    if len(items) != len(factors):
+        raise _error("tuple has the wrong number of components", node)
+    else:
+        return tuple(check(ctx, item, ty) for item, ty in zip(items, factors, strict=True))
+
+
 def check(ctx: Context, e: input_ast.Expr, ty: Ty) -> expr.Expr:
     """Check that `e` has type `ty`, elaborating it to a typed expression."""
     match e:
@@ -107,13 +154,7 @@ def check(ctx: Context, e: input_ast.Expr, ty: Ty) -> expr.Expr:
         case input_ast.TupleExpr(items):
             match ty:
                 case ProductType(factors):
-                    if len(items) != len(factors):
-                        raise _error("tuple has the wrong number of components", e)
-                    return expr.TupleExpr(
-                        tuple(
-                            check(ctx, item, t) for item, t in zip(items, factors, strict=True)
-                        )
-                    )
+                    return expr.TupleExpr(_check_tuple(ctx, e, items, factors))
                 case _:
                     raise _error(f"expected {render(ty)}, but got a tuple", e)
         case input_ast.Ite(cond, then_, else_):
@@ -134,39 +175,34 @@ def _check_domains(
     for binding in domains:
         if binding.domain not in ctx.domains:
             raise MathQLError(f"unknown domain {binding.domain}")
-    additions = {binding.var: ctx.domains[binding.domain] for binding in domains}
-    bindings = tuple(query.Binding(binding.var, binding.domain) for binding in domains)
-    return ctx.with_variables(additions), bindings
+    extended = functools.reduce(
+        lambda c, b: c.extend_domain_ident(b.var, b.domain), domains, ctx
+    )
+    return extended, tuple(query.Binding(b.var, b.domain) for b in domains)
 
 
-def _check_output_item(ctx: Context, item: input_ast.OutputItem) -> query.OutputItem:
-    if item.field is None:
-        if ctx.lookup_variable(item.var) is None:
-            raise MathQLError(f"unknown variable {item.var}")
-        return query.OutputItem(item.var, None)
-    else:
-        if not ctx.is_output_field(item.var, item.field):
-            raise MathQLError(f"{item.var} does not have output field {item.field}")
-        return query.OutputItem(item.var, item.field)
+def _output_column(ctx: Context, name: str, e: input_ast.Expr) -> query.OutputColumn:
+    ty, typed = infer(ctx, e)
+    return query.OutputColumn(name, ty, typed)
 
 
-def _check_order_entry(ctx: Context, entry: input_ast.OrderEntry) -> query.OrderEntry:
-    ty, typed = infer(ctx, entry.expr)
-    match ty:
-        case IntType() | BoolType() | StringType():
-            return query.OrderEntry(typed, entry.direction)
-        case _:
-            raise MathQLError(f"cannot order by a value of type {render(ty)}")
+def _order_entry(ctx: Context, entry: input_ast.OrderEntry) -> query.OrderEntry:
+    _, typed = infer(ctx, entry.expr)
+    return query.OrderEntry(typed, entry.direction)
 
 
 def check_query(ctx: Context, source: input_ast.Query) -> query.Query:
-    """Type-check a query, elaborating its condition and order into typed expressions."""
+    """Type-check a query, elaborating it into the typed query.
+
+    The output columns are checked independently — one may not refer to another — and
+    the order keys are checked with the output aliases in scope.
+    """
     ctx, bindings = _check_domains(ctx, source.domains)
-    output = tuple(_check_output_item(ctx, item) for item in source.output)
     condition_source = (
         source.condition if source.condition is not None else input_ast.BoolLit(True)
     )
     condition = check(ctx, condition_source, BoolType())
-    order_source = source.order if source.order is not None else ()
-    order = tuple(_check_order_entry(ctx, entry) for entry in order_source)
+    output = tuple(_output_column(ctx, name, e) for name, e in source.output)
+    extended = functools.reduce(lambda c, o: c.extend_ident(o.name, o.ty), output, ctx)
+    order = tuple(_order_entry(extended, entry) for entry in source.order or ())
     return query.Query(bindings, output, condition, order, source.limit)

@@ -15,20 +15,32 @@ from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import database_path, run_query
 
 _SUMMARY = """## Writing queries
-`query` takes domains (e.g. [["g", "Graph8"]]); output (["g.field", ...], or ["g"] for the
-whole object); and optional condition, order ([expression, "asc"|"desc"] pairs), and
-limit. Conditions and order expressions use fields (g.num_vertices), literals, arithmetic
-(+ - *), comparisons (== != < <= > >=), booleans (&& || !), defined/undefined for absence,
-and list/tuple literals. ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the
-`grammar` tool for the full grammar."""
+`query` takes: domains (e.g. [["g", "Graph8"]]); output, a mapping from each result
+column name to the expression it returns (e.g. {"g6": "id(g)", "edges": "g.num_edges"});
+and optional condition, order ([expression, "asc"|"desc"] pairs, which may refer to the
+output column names), and limit. Expressions use fields (g.num_vertices), id(x) for an
+object's primary key, literals, arithmetic (+ - *), comparisons (== != < <= > >=),
+booleans (&& || !), and defined/undefined for absence; a comparison needs both sides the
+same type. String literals are single-quoted ('text', a literal quote doubled as '').
+ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the `grammar` tool for the
+full grammar."""
 
 
 def _build_instructions(schema: dict[str, Any]) -> str:
     lines = [schema["overview"], "", "## Domains and fields"]
     for domain in schema["domains"]:
         lines.append(f"- {domain['name']}: {domain['doc']}")
-        for field in domain["fields"]:
-            lines.append(f"    {field['label']} : {field['type']} — {field['doc']}")
+        if domain["inputFields"]:
+            lines.append("  Input fields — scalar values, written `x.field`:")
+            for field in domain["inputFields"]:
+                lines.append(f"    {field['label']} : {field['type']} — {field['doc']}")
+        if domain["domainFields"]:
+            lines.append(
+                "  Domain fields — links to another object, written `x.field`, yielding "
+                "an object you can project or take id() of:"
+            )
+            for field in domain["domainFields"]:
+                lines.append(f"    {field['label']} → {field['domain']} — {field['doc']}")
     lines += ["", _SUMMARY, "", "## Examples (call `describe` for the full list)"]
     for example in schema["examples"][:3]:
         lines.append(f"- {example['note']}: {json.dumps(example['query'])}")
@@ -44,7 +56,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def query(
         domains: list[list[str]],
-        output: list[str],
+        output: dict[str, str],
         condition: str | None = None,
         order: list[list[str]] | None = None,
         limit: int | None = None,
@@ -52,9 +64,11 @@ def register(mcp: FastMCP) -> None:
         """Run a MathQL query and return the matching rows.
 
         domains: variable bindings, e.g. [["g", "Graph8"]].
-        output: items to return, each "x" (the whole object) or "x.field".
+        output: a mapping from result column name to the expression it returns,
+            e.g. {"g6": "id(g)", "edges": "g.num_edges"}.
         condition: a boolean expression over the bound variables (optional).
-        order: [expression, "asc"|"desc"] pairs (optional).
+        order: [expression, "asc"|"desc"] pairs; the expressions may refer to the
+            output column names (optional).
         limit: maximum number of rows (optional).
         """
         request: dict[str, Any] = {"domains": domains, "output": output}

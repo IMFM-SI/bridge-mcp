@@ -1,61 +1,67 @@
-"""Checks for the graphs-small database: SQL rendering and the schema description."""
+"""Checks for the math_data database: SQL rendering and the schema description."""
 
+from typing import Any
+
+from bridge_mcp.mathql import sql
+from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import render_query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
 
 
-def _typed(request: dict) -> object:
-    return check_query(database.typing_context(), from_json(request))
+def _rendered(request: dict[str, Any]) -> str:
+    return sql.render_query(
+        compile_query(database, check_query(database.context(), from_json(request)))
+    )
 
 
 def test_render_simple() -> None:
-    q = _typed(
+    rendered = _rendered(
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6"],
+            "output": {"graph6": "g.graph6"},
             "condition": "g.num_vertices == 5",
         }
     )
-    rendered = render_query(database, q)
-    assert rendered.startswith(
-        "SELECT g.graph6, g.num_vertices, g.num_edges, g.degree_sequence,"
-    )
-    assert "FROM graph AS g WHERE (g.num_vertices = 5)" in rendered
+    assert rendered == ("SELECT g.graph6 AS graph6 FROM graph AS g WHERE (g.num_vertices = 5)")
 
 
 def test_render_order_and_limit() -> None:
-    q = _typed(
+    rendered = _rendered(
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6"],
+            "output": {"graph6": "g.graph6"},
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
             "limit": 3,
         }
     )
-    rendered = render_query(database, q)
     assert rendered.endswith("WHERE (g.num_vertices = 5) ORDER BY g.num_edges DESC LIMIT 3")
 
 
 def test_render_list_literal() -> None:
-    q = _typed(
+    rendered = _rendered(
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6"],
+            "output": {"graph6": "g.graph6"},
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
     )
-    assert "(g.degree_sequence = json_array(2, 2, 2))" in render_query(database, q)
+    assert "(g.degree_sequence = json_array(2, 2, 2))" in rendered
+
+
+def test_id_is_graph6() -> None:
+    rendered = _rendered({"domains": [["g", "Graph8"]], "output": {"gid": "id(g)"}})
+    assert rendered == "SELECT g.graph6 AS gid FROM graph AS g WHERE 1"
 
 
 def test_describe() -> None:
-    described = database.describe()
+    described: Any = database.describe()
     assert described["overview"].startswith("All non-isomorphic")
     domains = described["domains"]
     assert domains[0]["name"] == "Graph8"
-    fields = {f["label"]: f["type"] for f in domains[0]["fields"]}
+    fields = {f["label"]: f["type"] for f in domains[0]["inputFields"]}
     assert fields["graph6"] == "string"
     assert fields["degree_sequence"] == "list int"
-    assert "graph6" in domains[0]["output"]
+    assert domains[0]["domainFields"] == []
+    assert all("output" in e["query"] for e in described["examples"])

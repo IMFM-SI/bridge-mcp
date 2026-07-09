@@ -9,9 +9,9 @@ from bridge_mcp.mathql.query_json import from_json
 
 
 def test_minimal() -> None:
-    q = from_json({"domains": [["g", "Graph8"]], "output": ["g.graph6"]})
+    q = from_json({"domains": [["g", "Graph8"]], "output": {"graph6": "g.graph6"}})
     assert q.domains == (ast.Binding("g", "Graph8"),)
-    assert q.output == (ast.OutputItem("g", "graph6"),)
+    assert q.output == (("graph6", ast.Field(ast.Ident("g"), "graph6")),)
     assert q.condition is None
     assert q.order is None
     assert q.limit is None
@@ -21,24 +21,37 @@ def test_full() -> None:
     q = from_json(
         {
             "domains": [["g", "Graph8"]],
-            "output": ["g.graph6", "g"],
+            "output": {"g6": "id(g)", "edges": "g.num_edges"},
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
             "limit": 3,
         }
     )
-    assert q.output == (ast.OutputItem("g", "graph6"), ast.OutputItem("g", None))
-    assert q.condition == ast.Compare(
-        ComparisonOp.EQ, ast.Field("g", "num_vertices"), ast.IntLit(5)
+    assert q.output == (
+        ("g6", ast.Id(ast.Ident("g"))),
+        ("edges", ast.Field(ast.Ident("g"), "num_edges")),
     )
-    assert q.order == (ast.OrderEntry(ast.Field("g", "num_edges"), Direction.DESC),)
+    assert q.condition == ast.Compare(
+        ComparisonOp.EQ, ast.Field(ast.Ident("g"), "num_vertices"), ast.IntLit(5)
+    )
+    assert q.order == (ast.OrderEntry(ast.Field(ast.Ident("g"), "num_edges"), Direction.DESC),)
     assert q.limit == 3
 
 
 def test_errors() -> None:
     with pytest.raises(MathQLError):
-        from_json({"output": ["g"]})  # missing domains
+        from_json({"output": {"n": "g.n"}})  # missing domains
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g"]], "output": ["g"]})  # malformed binding
+        from_json({"domains": [["g"]], "output": {"n": "g.n"}})  # malformed binding
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "Graph8"]], "output": ["g"], "order": [["g.n", "up"]]})
+        from_json({"domains": [["g", "G"]], "output": ["g.n"]})  # output must be a mapping
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": {"g.n": "g.n"}})  # bad column name
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": {"if": "g.n"}})  # keyword column name
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": {"n": 3}})  # non-string expression
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": {"n": "g.n"}, "order": [["g.n", "up"]]})
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": {"n": "g.n"}, "limit": -1})

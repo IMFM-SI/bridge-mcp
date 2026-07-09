@@ -9,6 +9,32 @@ from bridge_mcp.mathql.types import Ty
 
 
 @dataclass(frozen=True)
+class DomainIdent:
+    """A domain variable."""
+
+    name: str
+
+
+@dataclass(frozen=True)
+class Obj:
+    """The object of `domain` with the given primary key, `D[e1, ..., en]`."""
+
+    domain: str
+    args: tuple[Expr, ...]
+
+
+@dataclass(frozen=True)
+class DomainField:
+    """A field of an object that links to an object of another domain."""
+
+    domain: Domain
+    label: str
+
+
+Domain = DomainIdent | Obj | DomainField
+
+
+@dataclass(frozen=True)
 class IntLit:
     value: int
 
@@ -24,13 +50,24 @@ class StrLit:
 
 
 @dataclass(frozen=True)
-class Const:
+class Ident:
+    """A predefined constant, or an output alias in an order key."""
+
     name: str
 
 
 @dataclass(frozen=True)
+class Id:
+    """The primary key of the object denoted by `domain`."""
+
+    domain: Domain
+
+
+@dataclass(frozen=True)
 class Field:
-    var: str
+    """A scalar field of the object denoted by `domain`."""
+
+    domain: Domain
     label: str
 
 
@@ -92,7 +129,8 @@ Expr = (
     IntLit
     | BoolLit
     | StrLit
-    | Const
+    | Ident
+    | Id
     | Field
     | UnOp
     | BinOp

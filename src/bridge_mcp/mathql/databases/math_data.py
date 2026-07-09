@@ -5,137 +5,46 @@ The table `graph` has one row per graph; each column backs one field. Generated 
 `scripts/generate_graphs.py`.
 """
 
-from bridge_mcp.mathql import column
-from bridge_mcp.mathql.database import Database, Domain, Example, Field
-from bridge_mcp.mathql.types import BoolType, IntType, ListType, StringType
+from bridge_mcp.mathql.database import Column, Database, Example, Schema
+from bridge_mcp.mathql.types import BoolType, IntType, ListType, StringType, Ty
 
-_FIELDS = (
-    Field(
-        "graph6",
-        "graph6",
-        StringType(),
-        "the graph in graph6 encoding (nauty's canonical form)",
-        column.text,
-    ),
-    Field(
-        "num_vertices",
-        "num_vertices",
-        IntType(),
-        "order: the number of vertices",
-        column.integer,
-    ),
-    Field("num_edges", "num_edges", IntType(), "size: the number of edges", column.integer),
-    Field(
-        "degree_sequence",
-        "degree_sequence",
-        ListType(IntType()),
-        "the vertex degrees, sorted descending",
-        column.integer_list,
-    ),
-    Field("min_degree", "min_degree", IntType(), "the smallest vertex degree", column.integer),
-    Field("max_degree", "max_degree", IntType(), "the largest vertex degree", column.integer),
-    Field(
-        "is_regular",
-        "is_regular",
-        BoolType(),
-        "whether all vertices have the same degree",
-        column.boolean,
-    ),
-    Field(
-        "num_components",
-        "num_components",
-        IntType(),
-        "the number of connected components",
-        column.integer,
-    ),
-    Field(
-        "is_connected",
-        "is_connected",
-        BoolType(),
-        "whether the graph is connected",
-        column.boolean,
-    ),
-    Field(
-        "diameter",
+_COLUMNS: tuple[tuple[str, Ty, str], ...] = (
+    ("graph6", StringType(), "the graph in graph6 encoding (nauty's canonical form)"),
+    ("num_vertices", IntType(), "order: the number of vertices"),
+    ("num_edges", IntType(), "size: the number of edges"),
+    ("degree_sequence", ListType(IntType()), "the vertex degrees, sorted descending"),
+    ("min_degree", IntType(), "the smallest vertex degree"),
+    ("max_degree", IntType(), "the largest vertex degree"),
+    ("is_regular", BoolType(), "whether all vertices have the same degree"),
+    ("num_components", IntType(), "the number of connected components"),
+    ("is_connected", BoolType(), "whether the graph is connected"),
+    (
         "diameter",
         IntType(),
         "the greatest distance between two vertices; undefined when disconnected",
-        column.optional_integer,
     ),
-    Field(
-        "radius",
-        "radius",
-        IntType(),
-        "the minimum vertex eccentricity; undefined when disconnected",
-        column.optional_integer,
-    ),
-    Field(
-        "girth",
-        "girth",
-        IntType(),
-        "the length of a shortest cycle; undefined when acyclic",
-        column.optional_integer,
-    ),
-    Field("is_tree", "is_tree", BoolType(), "whether the graph is a tree", column.boolean),
-    Field(
-        "is_forest", "is_forest", BoolType(), "whether the graph is a forest", column.boolean
-    ),
-    Field(
-        "is_bipartite",
-        "is_bipartite",
-        BoolType(),
-        "whether the graph is bipartite",
-        column.boolean,
-    ),
-    Field("is_planar", "is_planar", BoolType(), "whether the graph is planar", column.boolean),
-    Field(
-        "is_eulerian",
-        "is_eulerian",
-        BoolType(),
-        "whether the graph has an Eulerian circuit",
-        column.boolean,
-    ),
-    Field(
-        "num_triangles",
-        "num_triangles",
-        IntType(),
-        "the number of triangles (3-cliques)",
-        column.integer,
-    ),
-    Field(
-        "clique_number",
-        "clique_number",
-        IntType(),
-        "the size of a largest clique",
-        column.integer,
-    ),
-    Field(
-        "independence_number",
-        "independence_number",
-        IntType(),
-        "the size of a largest independent set",
-        column.integer,
-    ),
-    Field(
-        "chromatic_number",
-        "chromatic_number",
-        IntType(),
-        "the chromatic number",
-        column.integer,
-    ),
-    Field(
-        "automorphism_count",
-        "automorphism_count",
-        IntType(),
-        "the order of the automorphism group",
-        column.integer,
-    ),
+    ("radius", IntType(), "the minimum vertex eccentricity; undefined when disconnected"),
+    ("girth", IntType(), "the length of a shortest cycle; undefined when acyclic"),
+    ("is_tree", BoolType(), "whether the graph is a tree"),
+    ("is_forest", BoolType(), "whether the graph is a forest"),
+    ("is_bipartite", BoolType(), "whether the graph is bipartite"),
+    ("is_planar", BoolType(), "whether the graph is planar"),
+    ("is_eulerian", BoolType(), "whether the graph has an Eulerian circuit"),
+    ("num_triangles", IntType(), "the number of triangles (3-cliques)"),
+    ("clique_number", IntType(), "the size of a largest clique"),
+    ("independence_number", IntType(), "the size of a largest independent set"),
+    ("chromatic_number", IntType(), "the chromatic number"),
+    ("automorphism_count", IntType(), "the order of the automorphism group"),
 )
 
-_GRAPH = Domain(
+_GRAPH = Schema(
     table="graph",
-    fields=_FIELDS,
-    doc="A finite simple graph on up to 8 vertices (no loops or multiple edges), up to isomorphism.",
+    columns={name: Column(name, ty, name == "graph6", doc) for name, ty, doc in _COLUMNS},
+    foreign_keys={},
+    doc=(
+        "A finite simple graph on up to 8 vertices (no loops or multiple edges), "
+        "up to isomorphism."
+    ),
 )
 
 database = Database(
@@ -150,7 +59,7 @@ database = Database(
             "the trees on 5 vertices",
             {
                 "domains": [["g", "Graph8"]],
-                "output": ["g.graph6", "g.degree_sequence"],
+                "output": {"graph6": "g.graph6", "degree_sequence": "g.degree_sequence"},
                 "condition": "g.num_vertices == 5 && g.is_tree",
             },
         ),
@@ -158,7 +67,7 @@ database = Database(
             "the three graphs on 5 vertices with the most edges",
             {
                 "domains": [["g", "Graph8"]],
-                "output": ["g.graph6", "g.num_edges"],
+                "output": {"graph6": "g.graph6", "num_edges": "g.num_edges"},
                 "condition": "g.num_vertices == 5",
                 "order": [["g.num_edges", "desc"]],
                 "limit": 3,
@@ -168,7 +77,7 @@ database = Database(
             "connected non-planar graphs on at least 6 vertices, fewest vertices first",
             {
                 "domains": [["g", "Graph8"]],
-                "output": ["g.graph6", "g.num_vertices"],
+                "output": {"graph6": "g.graph6", "num_vertices": "g.num_vertices"},
                 "condition": "g.is_connected && !g.is_planar && g.num_vertices >= 6",
                 "order": [["g.num_vertices", "asc"]],
                 "limit": 5,
@@ -178,17 +87,29 @@ database = Database(
             "pairs of graphs with equally many vertices where the first has fewer edges",
             {
                 "domains": [["g", "Graph8"], ["h", "Graph8"]],
-                "output": ["g.graph6", "h.graph6"],
+                "output": {"first": "g.graph6", "second": "h.graph6"},
                 "condition": "g.num_vertices == h.num_vertices && g.num_edges < h.num_edges",
                 "limit": 5,
             },
         ),
         Example(
-            "forests (girth undefined) on at most 4 vertices, returned whole",
+            "forests (girth undefined) on at most 4 vertices",
             {
                 "domains": [["g", "Graph8"]],
-                "output": ["g"],
+                "output": {"graph6": "g.graph6"},
                 "condition": "undefined g.girth && g.num_vertices <= 4",
+                "limit": 5,
+            },
+        ),
+        Example(
+            "bipartite or planar graphs whose diameter is defined and exceeds 2, widest first",
+            {
+                "domains": [["g", "Graph8"]],
+                "output": {"graph6": "g.graph6", "diameter": "g.diameter"},
+                "condition": (
+                    "(g.is_bipartite || g.is_planar) && defined g.diameter && g.diameter > 2"
+                ),
+                "order": [["g.diameter", "desc"]],
                 "limit": 5,
             },
         ),
@@ -196,7 +117,11 @@ database = Database(
             "the most irregular graphs, by the spread between max and min degree",
             {
                 "domains": [["g", "Graph8"]],
-                "output": ["g.graph6", "g.max_degree", "g.min_degree"],
+                "output": {
+                    "graph6": "g.graph6",
+                    "max_degree": "g.max_degree",
+                    "min_degree": "g.min_degree",
+                },
                 "condition": "g.max_degree != g.min_degree",
                 "order": [["g.max_degree - g.min_degree", "desc"]],
                 "limit": 3,
