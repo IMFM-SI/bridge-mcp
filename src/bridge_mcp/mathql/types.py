@@ -52,6 +52,15 @@ def render(ty: Ty) -> str:
     assert_never(ty)
 
 
+def product_of(factors: tuple[Ty, ...]) -> Ty:
+    """The product of `factors`, eliding the product when there is exactly one."""
+    match factors:
+        case (single,):
+            return single
+        case _:
+            return ProductType(factors)
+
+
 def unary_type(op: UnaryOp) -> tuple[Ty, Ty]:
     """The operand and result type of a unary operator."""
     match op:

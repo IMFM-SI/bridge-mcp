@@ -1,7 +1,7 @@
-"""Checks for SQL expression rendering."""
+"""Checks for SQL expression and query rendering."""
 
 from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.operators import BinaryOp, ComparisonOp
+from bridge_mcp.mathql.operators import BinaryOp, ComparisonOp, Direction
 
 
 def test_render_atoms() -> None:
@@ -32,3 +32,45 @@ def test_render_presence_and_case() -> None:
 def test_render_json() -> None:
     assert sql.render(sql.JsonArray((sql.IntLit(1), sql.IntLit(2)))) == "json_array(1, 2)"
     assert sql.render(sql.JsonExtract(sql.Col("g", "x"), 0)) == "json_extract(g.x, '$[0]')"
+
+
+def test_render_ref() -> None:
+    assert sql.render(sql.Ref("m")) == "m"
+
+
+def test_json_array_elides_singleton() -> None:
+    assert sql.json_array((sql.IntLit(1),)) == sql.IntLit(1)
+    assert sql.json_array((sql.IntLit(1), sql.IntLit(2))) == sql.JsonArray(
+        (sql.IntLit(1), sql.IntLit(2))
+    )
+    assert sql.json_array(()) == sql.JsonArray(())
+
+
+def test_render_query() -> None:
+    q = sql.Query(
+        froms=(("graph", "g"),),
+        joins=(),
+        output=((sql.Col("g", "graph6"), "g6"),),
+        cond=sql.BoolLit(True),
+        order=((sql.Ref("g6"), Direction.DESC),),
+        limit=3,
+    )
+    assert (
+        sql.render_query(q)
+        == "SELECT g.graph6 AS g6 FROM graph AS g WHERE 1 ORDER BY g6 DESC LIMIT 3"
+    )
+
+
+def test_render_query_join() -> None:
+    q = sql.Query(
+        froms=(("maniplex", "m"),),
+        joins=(sql.Join("graph", "m_skeleton", (("id", sql.Col("m", "skeleton_id")),)),),
+        output=((sql.Col("m_skeleton", "graph6"), "s"),),
+        cond=sql.BoolLit(True),
+        order=(),
+        limit=None,
+    )
+    assert sql.render_query(q) == (
+        "SELECT m_skeleton.graph6 AS s FROM maniplex AS m"
+        " LEFT JOIN graph AS m_skeleton ON m_skeleton.id = m.skeleton_id WHERE 1"
+    )

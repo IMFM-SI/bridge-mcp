@@ -15,6 +15,13 @@ class Col:
 
 
 @dataclass(frozen=True)
+class Ref:
+    """An output-column alias; meaningful only in ORDER BY position."""
+
+    name: str
+
+
+@dataclass(frozen=True)
 class IntLit:
     value: int
 
@@ -84,6 +91,7 @@ class JsonExtract:
 
 Expr = (
     Col
+    | Ref
     | IntLit
     | StrLit
     | BoolLit
@@ -97,6 +105,15 @@ Expr = (
     | JsonArray
     | JsonExtract
 )
+
+
+def json_array(items: tuple[Expr, ...]) -> Expr:
+    """A `json_array` of `items`, elided when there is exactly one."""
+    match items:
+        case (single,):
+            return single
+        case _:
+            return JsonArray(items)
 
 
 def render_unary_op(op: UnaryOp) -> str:
@@ -157,6 +174,8 @@ def render(e: Expr) -> str:
     match e:
         case Col(table, column):
             return f"{table}.{column}"
+        case Ref(name):
+            return name
         case IntLit(value):
             return str(value)
         case BoolLit(value):
@@ -182,3 +201,49 @@ def render(e: Expr) -> str:
         case JsonExtract(expr, index):
             return f"json_extract({render(expr)}, '$[{index}]')"
     assert_never(e)
+
+
+@dataclass(frozen=True)
+class Join:
+    """A hoisted `LEFT JOIN`: the table, its alias, and the columnwise equalities
+    `alias.column = expr` that form the `ON` condition."""
+
+    table: str
+    alias: str
+    equalities: tuple[tuple[str, Expr], ...]
+
+
+@dataclass(frozen=True)
+class Query:
+    """A SQL `SELECT` query: the `FROM` tables with their aliases, the hoisted joins,
+    the output columns each with its alias, the boolean condition, the ordering, and
+    the limit."""
+
+    froms: tuple[tuple[str, str], ...]
+    joins: tuple[Join, ...]
+    output: tuple[tuple[Expr, str], ...]
+    cond: Expr
+    order: tuple[tuple[Expr, Direction], ...]
+    limit: int | None
+
+
+def _render_join(join: Join) -> str:
+    conditions = [f"{join.alias}.{column} = {render(e)}" for column, e in join.equalities]
+    on = " AND ".join(conditions) if conditions else "1"
+    return f" LEFT JOIN {join.table} AS {join.alias} ON {on}"
+
+
+def render_query(q: Query) -> str:
+    """Render a query to SQLite text, with a bare condition. Each output column is
+    rendered as `<expr> AS <alias>`; a hoisted join renders as `LEFT JOIN`, so when it
+    matches no row its columns are NULL."""
+    froms = ", ".join(f"{table} AS {alias}" for table, alias in q.froms)
+    joins = "".join(_render_join(join) for join in q.joins)
+    columns = ", ".join(f"{render(e)} AS {alias}" for e, alias in q.output)
+    order = (
+        " ORDER BY " + ", ".join(f"{render(e)} {render_direction(d)}" for e, d in q.order)
+        if q.order
+        else ""
+    )
+    limit = f" LIMIT {q.limit}" if q.limit is not None else ""
+    return f"SELECT {columns} FROM {froms}{joins} WHERE {render(q.cond)}{order}{limit}"

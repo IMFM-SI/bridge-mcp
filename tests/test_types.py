@@ -8,6 +8,7 @@ from bridge_mcp.mathql.types import (
     ProductType,
     StringType,
     binary_type,
+    product_of,
     render,
     unary_type,
 )
@@ -19,6 +20,12 @@ def test_render() -> None:
     assert render(StringType()) == "string"
     assert render(ListType(IntType())) == "list int"
     assert render(ProductType((IntType(), BoolType()))) == "prod [int, bool]"
+
+
+def test_product_of() -> None:
+    assert product_of((IntType(),)) == IntType()
+    assert product_of((IntType(), BoolType())) == ProductType((IntType(), BoolType()))
+    assert product_of(()) == ProductType(())
 
 
 def test_equality() -> None:
