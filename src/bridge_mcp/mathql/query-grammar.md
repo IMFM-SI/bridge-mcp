@@ -70,7 +70,7 @@ Types are never written down in a query, but may appear in error messages.
 
 The output, condition, and order expressions are written in the following grammar. It is
 ambiguous as written, but the clauses are written in the order of precedence.
-Precedence and associativity are described in detail in *Precedence and associativity** below.
+Precedence and associativity are described in detail in **Precedence and associativity** below.
 
 ```
 expr ::= "if" expr "then" expr "else" expr
