@@ -13,6 +13,7 @@ dependencies = [
     "mcp[cli]",
     "lark",
     "networkx",
+    "numpy",
 ]
 
 [project.optional-dependencies]
