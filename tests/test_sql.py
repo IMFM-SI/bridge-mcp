@@ -10,7 +10,7 @@ def test_render_atoms() -> None:
     assert sql.render(sql.BoolLit(False)) == "0"
     assert sql.render(sql.Null()) == "NULL"
     assert sql.render(sql.StrLit("a'b")) == "'a''b'"
-    assert sql.render(sql.Col("g", "n")) == "g.n"
+    assert sql.render(sql.Col("g", "n")) == '"g"."n"'
 
 
 def test_render_compound() -> None:
@@ -19,23 +19,26 @@ def test_render_compound() -> None:
         sql.Compare(ComparisonOp.GT, sql.Col("g", "num_vertices"), sql.IntLit(3)),
         sql.Col("g", "is_planar"),
     )
-    assert sql.render(expr) == "((g.num_vertices > 3) AND g.is_planar)"
+    assert sql.render(expr) == '(("g"."num_vertices" > 3) AND "g"."is_planar")'
 
 
 def test_render_presence_and_case() -> None:
-    assert sql.render(sql.IsNull(sql.Col("g", "d"))) == "(g.d IS NULL)"
-    assert sql.render(sql.IsNotNull(sql.Col("g", "d"))) == "(g.d IS NOT NULL)"
+    assert sql.render(sql.IsNull(sql.Col("g", "d"))) == '("g"."d" IS NULL)'
+    assert sql.render(sql.IsNotNull(sql.Col("g", "d"))) == '("g"."d" IS NOT NULL)'
     case = sql.Case(sql.BoolLit(True), sql.IntLit(1), sql.IntLit(2))
     assert sql.render(case) == "(CASE WHEN 1 THEN 1 ELSE 2 END)"
 
 
 def test_render_json() -> None:
     assert sql.render(sql.JsonArray((sql.IntLit(1), sql.IntLit(2)))) == "json_array(1, 2)"
-    assert sql.render(sql.JsonExtract(sql.Col("g", "x"), 0)) == "json_extract(g.x, '$[0]')"
+    assert (
+        sql.render(sql.JsonExtract(sql.Col("g", "x"), 0)) == 'json_extract("g"."x", \'$[0]\')'
+    )
+    assert sql.render(sql.Json(sql.Col("g", "x"))) == 'json("g"."x")'
 
 
 def test_render_ref() -> None:
-    assert sql.render(sql.Ref("m")) == "m"
+    assert sql.render(sql.Ref("m")) == '"m"'
 
 
 def test_json_array_elides_singleton() -> None:
@@ -57,7 +60,7 @@ def test_render_query() -> None:
     )
     assert (
         sql.render_query(q)
-        == "SELECT g.graph6 AS g6 FROM graph AS g WHERE 1 ORDER BY g6 DESC LIMIT 3"
+        == 'SELECT "g"."graph6" AS "g6" FROM "graph" AS "g" WHERE 1 ORDER BY "g6" DESC LIMIT 3'
     )
 
 
@@ -71,6 +74,6 @@ def test_render_query_join() -> None:
         limit=None,
     )
     assert sql.render_query(q) == (
-        "SELECT m_skeleton.graph6 AS s FROM maniplex AS m"
-        " LEFT JOIN graph AS m_skeleton ON m_skeleton.id = m.skeleton_id WHERE 1"
+        'SELECT "m_skeleton"."graph6" AS "s" FROM "maniplex" AS "m"'
+        ' LEFT JOIN "graph" AS "m_skeleton" ON "m_skeleton"."id" = "m"."skeleton_id" WHERE 1'
     )

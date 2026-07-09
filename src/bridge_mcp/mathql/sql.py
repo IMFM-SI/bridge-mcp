@@ -79,6 +79,13 @@ class Case:
 
 
 @dataclass(frozen=True)
+class Json:
+    """A `json` call: the canonical (minified) text of a JSON value."""
+
+    expr: Expr
+
+
+@dataclass(frozen=True)
 class JsonArray:
     items: tuple[Expr, ...]
 
@@ -102,6 +109,7 @@ Expr = (
     | IsNull
     | IsNotNull
     | Case
+    | Json
     | JsonArray
     | JsonExtract
 )
@@ -157,6 +165,11 @@ def render_comparison_op(op: ComparisonOp) -> str:
     assert_never(op)
 
 
+def render_ident(name: str) -> str:
+    """Render an identifier, double-quoted, an embedded quote doubled."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 def render_direction(direction: Direction) -> str:
     match direction:
         case Direction.ASC:
@@ -173,9 +186,9 @@ def render(e: Expr) -> str:
     """
     match e:
         case Col(table, column):
-            return f"{table}.{column}"
+            return f"{render_ident(table)}.{render_ident(column)}"
         case Ref(name):
-            return name
+            return render_ident(name)
         case IntLit(value):
             return str(value)
         case BoolLit(value):
@@ -196,6 +209,8 @@ def render(e: Expr) -> str:
             return f"({render(expr)} IS NOT NULL)"
         case Case(cond, then_, else_):
             return f"(CASE WHEN {render(cond)} THEN {render(then_)} ELSE {render(else_)} END)"
+        case Json(expr):
+            return f"json({render(expr)})"
         case JsonArray(items):
             return f"json_array({', '.join(render(item) for item in items)})"
         case JsonExtract(expr, index):
@@ -228,18 +243,23 @@ class Query:
 
 
 def _render_join(join: Join) -> str:
-    conditions = [f"{join.alias}.{column} = {render(e)}" for column, e in join.equalities]
+    conditions = [
+        f"{render_ident(join.alias)}.{render_ident(column)} = {render(e)}"
+        for column, e in join.equalities
+    ]
     on = " AND ".join(conditions) if conditions else "1"
-    return f" LEFT JOIN {join.table} AS {join.alias} ON {on}"
+    return f" LEFT JOIN {render_ident(join.table)} AS {render_ident(join.alias)} ON {on}"
 
 
 def render_query(q: Query) -> str:
     """Render a query to SQLite text, with a bare condition. Each output column is
     rendered as `<expr> AS <alias>`; a hoisted join renders as `LEFT JOIN`, so when it
     matches no row its columns are NULL."""
-    froms = ", ".join(f"{table} AS {alias}" for table, alias in q.froms)
+    froms = ", ".join(
+        f"{render_ident(table)} AS {render_ident(alias)}" for table, alias in q.froms
+    )
     joins = "".join(_render_join(join) for join in q.joins)
-    columns = ", ".join(f"{render(e)} AS {alias}" for e, alias in q.output)
+    columns = ", ".join(f"{render(e)} AS {render_ident(alias)}" for e, alias in q.output)
     order = (
         " ORDER BY " + ", ".join(f"{render(e)} {render_direction(d)}" for e, d in q.order)
         if q.order

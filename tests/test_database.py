@@ -23,7 +23,9 @@ def test_render_simple() -> None:
             "condition": "g.num_vertices == 5",
         }
     )
-    assert rendered == ("SELECT g.graph6 AS graph6 FROM graph AS g WHERE (g.num_vertices = 5)")
+    assert rendered == (
+        'SELECT "g"."graph6" AS "graph6" FROM "graph" AS "g" WHERE ("g"."num_vertices" = 5)'
+    )
 
 
 def test_render_order_and_limit() -> None:
@@ -36,7 +38,9 @@ def test_render_order_and_limit() -> None:
             "limit": 3,
         }
     )
-    assert rendered.endswith("WHERE (g.num_vertices = 5) ORDER BY g.num_edges DESC LIMIT 3")
+    assert rendered.endswith(
+        'WHERE ("g"."num_vertices" = 5) ORDER BY "g"."num_edges" DESC LIMIT 3'
+    )
 
 
 def test_render_list_literal() -> None:
@@ -47,12 +51,12 @@ def test_render_list_literal() -> None:
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
     )
-    assert "(g.degree_sequence = json_array(2, 2, 2))" in rendered
+    assert '(json("g"."degree_sequence") = json(json_array(2, 2, 2)))' in rendered
 
 
 def test_id_is_graph6() -> None:
     rendered = _rendered({"domains": [["g", "Graph8"]], "output": {"gid": "id(g)"}})
-    assert rendered == "SELECT g.graph6 AS gid FROM graph AS g WHERE 1"
+    assert rendered == 'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
 
 
 def test_describe() -> None:

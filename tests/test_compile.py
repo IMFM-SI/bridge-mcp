@@ -52,13 +52,13 @@ def test_fields_and_condition() -> None:
         _rendered(
             {"domains": [["g", "Graph"]], "output": {"n": "g.n"}, "condition": "g.n > 3"}
         )
-        == "SELECT g.n AS n FROM graph AS g WHERE (g.n > 3)"
+        == 'SELECT "g"."n" AS "n" FROM "graph" AS "g" WHERE ("g"."n" > 3)'
     )
 
 
 def test_id_of_single_column_key() -> None:
     assert _rendered({"domains": [["g", "Graph"]], "output": {"gid": "id(g)"}}) == (
-        "SELECT g.graph6 AS gid FROM graph AS g WHERE 1"
+        'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
     )
 
 
@@ -71,9 +71,9 @@ def test_domain_field_hoists_one_join() -> None:
         }
     )
     assert rendered == (
-        "SELECT m_skeleton.graph6 AS s FROM maniplex AS m"
-        " LEFT JOIN graph AS m_skeleton ON m_skeleton.graph6 = m.skeleton_graph6"
-        " WHERE (m_skeleton.n > 3)"
+        'SELECT "m_skeleton"."graph6" AS "s" FROM "maniplex" AS "m"'
+        ' LEFT JOIN "graph" AS "m_skeleton" ON "m_skeleton"."graph6" = "m"."skeleton_graph6"'
+        ' WHERE ("m_skeleton"."n" > 3)'
     )
 
 
@@ -86,9 +86,9 @@ def test_obj_hoists_a_join() -> None:
         }
     )
     assert rendered == (
-        "SELECT Graph.n AS n FROM graph AS g"
-        " LEFT JOIN graph AS Graph ON Graph.graph6 = 'abc'"
-        " WHERE (g.n = Graph.n)"
+        'SELECT "Graph"."n" AS "n" FROM "graph" AS "g"'
+        ' LEFT JOIN "graph" AS "Graph" ON "Graph"."graph6" = \'abc\''
+        ' WHERE ("g"."n" = "Graph"."n")'
     )
 
 
@@ -100,7 +100,7 @@ def test_defined_on_domain_field() -> None:
             "condition": "defined id(m.skeleton)",
         }
     )
-    assert "WHERE (m_skeleton.graph6 IS NOT NULL)" in rendered
+    assert 'WHERE ("m_skeleton"."graph6" IS NOT NULL)' in rendered
 
 
 def test_order_by_alias_renders_bare() -> None:
@@ -113,7 +113,7 @@ def test_order_by_alias_renders_bare() -> None:
         }
     )
     assert rendered == (
-        "SELECT (g.n * g.n) AS m FROM graph AS g WHERE 1 ORDER BY m DESC LIMIT 3"
+        'SELECT ("g"."n" * "g"."n") AS "m" FROM "graph" AS "g" WHERE 1 ORDER BY "m" DESC LIMIT 3'
     )
 
 
@@ -124,7 +124,7 @@ def test_fresh_alias_avoids_variables() -> None:
             "output": {"n": "Graph['abc'].n"},
         }
     )
-    assert "LEFT JOIN graph AS Graph2 ON Graph2.graph6 = 'abc'" in rendered
+    assert 'LEFT JOIN "graph" AS "Graph2" ON "Graph2"."graph6" = \'abc\'' in rendered
 
 
 def test_tuples_projections_and_conditional() -> None:
@@ -135,11 +135,11 @@ def test_tuples_projections_and_conditional() -> None:
             "condition": "if g.planar then g.n > 0 else [1, 2] == [g.n, g.n]",
         }
     )
-    assert "json_array(g.n, g.planar) AS pair" in rendered
-    assert "json_extract(json_array(g.n, g.planar), '$[0]') AS first" in rendered
+    assert 'json_array("g"."n", "g"."planar") AS "pair"' in rendered
+    assert 'json_extract(json_array("g"."n", "g"."planar"), \'$[0]\') AS "first"' in rendered
     assert (
-        "CASE WHEN g.planar THEN (g.n > 0) ELSE (json_array(1, 2) = json_array(g.n, g.n)) END"
-        in rendered
+        'CASE WHEN "g"."planar" THEN ("g"."n" > 0)'
+        ' ELSE (json(json_array(1, 2)) = json(json_array("g"."n", "g"."n"))) END' in rendered
     )
 
 

@@ -13,6 +13,7 @@ from bridge_mcp.mathql import expr, sql
 from bridge_mcp.mathql.database import Column, Database, Schema
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.query import Query
+from bridge_mcp.mathql.types import ListType, ProductType
 
 
 @dataclass(frozen=True)
@@ -186,10 +187,14 @@ def compile_expr(ctx: SqlContext, state: CompileState, e: expr.Expr) -> sql.Expr
             return sql.BinOp(
                 op, compile_expr(ctx, state, left), compile_expr(ctx, state, right)
             )
-        case expr.Compare(op, _, left, right):
-            return sql.Compare(
-                op, compile_expr(ctx, state, left), compile_expr(ctx, state, right)
-            )
+        case expr.Compare(op, ty, left, right):
+            left_sql = compile_expr(ctx, state, left)
+            right_sql = compile_expr(ctx, state, right)
+            match ty:
+                case ListType() | ProductType():
+                    return sql.Compare(op, sql.Json(left_sql), sql.Json(right_sql))
+                case _:
+                    return sql.Compare(op, left_sql, right_sql)
         case expr.Ite(cond, then_, else_):
             return sql.Case(
                 compile_expr(ctx, state, cond),
