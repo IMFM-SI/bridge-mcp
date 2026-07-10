@@ -56,7 +56,13 @@ _GRAPH = Schema(
     table="graph",
     columns={name: Column(name, ty, name == "graph6", doc) for name, ty, doc in _COLUMNS},
     foreign_keys={
-        "source": ForeignKey("Source", (("source", "id"),), "who produced this row")
+        "source": ForeignKey("Source", (("source", "id"),), "who produced this row"),
+        "automorphism_group": ForeignKey(
+            "Group",
+            (("aut_group_order", "order"), ("aut_group_index", "index")),
+            "the automorphism group as a census group; undefined when its order "
+            "exceeds 127 or the graph has more than 8 vertices",
+        ),
     },
     doc=(
         "A finite simple graph, up to isomorphism: every graph on up to 8 vertices, "

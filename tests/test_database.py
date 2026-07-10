@@ -68,5 +68,5 @@ def test_describe() -> None:
     assert fields["graph6"] == "string"
     assert fields["degree_sequence"] == "list int"
     links = {f["label"]: f["domain"] for f in domains[0]["domainFields"]}
-    assert links == {"source": "Source"}
+    assert links == {"source": "Source", "automorphism_group": "Group"}
     assert all("output" in e["query"] for e in described["examples"])

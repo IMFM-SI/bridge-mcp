@@ -70,7 +70,9 @@ INVARIANTS: list[Invariant] = [
 ]
 
 COLUMNS: list[tuple[str, str]] = (
-    [("graph6", "TEXT")] + [(name, ty) for name, ty, _ in INVARIANTS] + [("source", "TEXT")]
+    [("graph6", "TEXT")]
+    + [(name, ty) for name, ty, _ in INVARIANTS]
+    + [("source", "TEXT"), ("aut_group_order", "INTEGER"), ("aut_group_index", "INTEGER")]
 )
 
 
@@ -85,7 +87,7 @@ def generate(n: int) -> list[str]:
 
 def row_for(graph6: str) -> list[object]:
     graph = nx.from_graph6_bytes(graph6.encode("ascii"))
-    return [graph6] + [extract(graph) for _, _, extract in INVARIANTS] + ["geng"]
+    return [graph6] + [extract(graph) for _, _, extract in INVARIANTS] + ["geng", None, None]
 
 
 def record_graph_provenance(connection: sqlite3.Connection) -> None:
