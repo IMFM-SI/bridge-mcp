@@ -18,7 +18,7 @@ def _rendered(request: dict[str, Any]) -> str:
 def test_render_simple() -> None:
     rendered = _rendered(
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"graph6": "g.graph6"},
             "condition": "g.num_vertices == 5",
         }
@@ -31,7 +31,7 @@ def test_render_simple() -> None:
 def test_render_order_and_limit() -> None:
     rendered = _rendered(
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"graph6": "g.graph6"},
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
@@ -46,7 +46,7 @@ def test_render_order_and_limit() -> None:
 def test_render_list_literal() -> None:
     rendered = _rendered(
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"graph6": "g.graph6"},
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
@@ -55,15 +55,15 @@ def test_render_list_literal() -> None:
 
 
 def test_id_is_graph6() -> None:
-    rendered = _rendered({"domains": [["g", "Graph8"]], "output": {"gid": "id(g)"}})
+    rendered = _rendered({"domains": [["g", "Graph"]], "output": {"gid": "id(g)"}})
     assert rendered == 'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
 
 
 def test_describe() -> None:
     described: Any = database.describe()
-    assert described["overview"].startswith("Two collections")
+    assert described["overview"].startswith("Three collections")
     domains = described["domains"]
-    assert domains[0]["name"] == "Graph8"
+    assert domains[0]["name"] == "Graph"
     fields = {f["label"]: f["type"] for f in domains[0]["inputFields"]}
     assert fields["graph6"] == "string"
     assert fields["degree_sequence"] == "list int"

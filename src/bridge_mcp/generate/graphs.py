@@ -26,6 +26,7 @@ from bridge_mcp.graph.invariants import (
 
 DEFAULT_MAX_VERTICES = 8
 GENG = "geng"
+LABELG = "labelg"
 
 
 # --- the invariant schema: (column, sql_type, extractor) ---
@@ -74,9 +75,12 @@ COLUMNS: list[tuple[str, str]] = (
 
 
 def generate(n: int) -> list[str]:
-    """All non-isomorphic graphs on `n` vertices, as graph6 strings."""
-    result = subprocess.run([GENG, str(n)], capture_output=True, text=True, check=True)
-    return result.stdout.split()
+    """All non-isomorphic graphs on `n` vertices, in canonical graph6 form."""
+    generated = subprocess.run([GENG, str(n)], capture_output=True, text=True, check=True)
+    canonical = subprocess.run(
+        [LABELG], input=generated.stdout, capture_output=True, text=True, check=True
+    )
+    return canonical.stdout.split()
 
 
 def row_for(graph6: str) -> list[object]:
@@ -98,15 +102,26 @@ def record_graph_provenance(connection: sqlite3.Connection) -> None:
                 "nauty, by Brendan McKay and Adolfo Piperno",
             ),
             ("networkx", "networkx", nx.__version__, "graph invariants", None, None),
+            (
+                "nauty",
+                "nauty labelg",
+                None,
+                "canonical labeling of every graph",
+                None,
+                "nauty, by Brendan McKay and Adolfo Piperno",
+            ),
             bridge_mcp_source(),
         ],
     )
     record_provenance(
         connection,
-        ["Graph8"],
-        [("Graph8", "graph6", "geng", "graphs on up to 8 vertices")]
-        + [("Graph8", name, "networkx", "") for name, _, _ in INVARIANTS]
-        + [("Graph8", "source", "bridge-mcp", "bookkeeping")],
+        ["Graph"],
+        [
+            ("Graph", "graph6", "geng", "graphs on up to 8 vertices"),
+            ("Graph", "graph6", "nauty", "canonical labeling (labelg)"),
+        ]
+        + [("Graph", name, "networkx", "") for name, _, _ in INVARIANTS]
+        + [("Graph", "source", "bridge-mcp", "bookkeeping")],
     )
 
 

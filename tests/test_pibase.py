@@ -86,7 +86,7 @@ def test_nullable_theorem_link() -> None:
 def test_describe_includes_pibase_domains() -> None:
     described: Any = database.describe()
     domains = {d["name"]: d for d in described["domains"]}
-    assert {"Graph8", "Space", "Property", "Trait", "Theorem"} <= set(domains)
+    assert {"Graph", "Space", "Property", "Trait", "Theorem"} <= set(domains)
     links = {f["label"]: f["domain"] for f in domains["Trait"]["domainFields"]}
     assert links == {"space": "Space", "property": "Property", "theorem": "Theorem"}
     trait_fields = {f["label"]: f["type"] for f in domains["Trait"]["inputFields"]}

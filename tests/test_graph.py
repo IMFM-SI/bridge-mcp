@@ -80,15 +80,13 @@ def test_invariants_match_database() -> None:
         pytest.skip(f"{db} not present")
     connection = sqlite3.connect(db)
     output = {
-        label: f"g.{label}"
-        for label in database.domains["Graph8"].columns
-        if label != "graph6"
+        label: f"g.{label}" for label in database.domains["Graph"].columns if label != "graph6"
     }
     rows = run_query(
         connection,
         database,
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": output,
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },

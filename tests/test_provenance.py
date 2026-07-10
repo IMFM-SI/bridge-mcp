@@ -40,7 +40,7 @@ def test_provenance_source_join() -> None:
 def test_graph_source_join() -> None:
     rendered = _rendered(
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"src": "id(g.source)"},
             "condition": "g.graph6 == 'Bw'",
         }
@@ -97,7 +97,7 @@ def test_graph_rows_link_their_source(connection: sqlite3.Connection) -> None:
         connection,
         database,
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"src": "id(g.source)", "tool": "g.source.tool"},
             "condition": "g.graph6 == 'Bw'",
         },

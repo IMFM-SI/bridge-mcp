@@ -54,7 +54,7 @@ GROUP = Schema(
     },
     foreign_keys={
         "cayley_graph": ForeignKey(
-            "Graph8",
+            "Graph",
             (("cayley_graph", "graph6"),),
             "the Cayley graph on the minimal generating set (undirected, without "
             "the identity); undefined above order 100",

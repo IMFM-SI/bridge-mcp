@@ -52,7 +52,7 @@ def test_describe_includes_group_domain() -> None:
     assert fields["abelianization"] == "list int"
     assert fields["cayley_generators"] == "list string"
     links = {f["label"]: f["domain"] for f in domains["Group"]["domainFields"]}
-    assert links == {"cayley_graph": "Graph8"}
+    assert links == {"cayley_graph": "Graph"}
 
 
 @pytest.fixture

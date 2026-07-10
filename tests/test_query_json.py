@@ -9,8 +9,8 @@ from bridge_mcp.mathql.query_json import from_json
 
 
 def test_minimal() -> None:
-    q = from_json({"domains": [["g", "Graph8"]], "output": {"graph6": "g.graph6"}})
-    assert q.domains == (ast.Binding("g", "Graph8"),)
+    q = from_json({"domains": [["g", "Graph"]], "output": {"graph6": "g.graph6"}})
+    assert q.domains == (ast.Binding("g", "Graph"),)
     assert q.output == (("graph6", ast.Field(ast.Ident("g"), "graph6")),)
     assert q.condition is None
     assert q.order is None
@@ -20,7 +20,7 @@ def test_minimal() -> None:
 def test_full() -> None:
     q = from_json(
         {
-            "domains": [["g", "Graph8"]],
+            "domains": [["g", "Graph"]],
             "output": {"g6": "id(g)", "edges": "g.num_edges"},
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],

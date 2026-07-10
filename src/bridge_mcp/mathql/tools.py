@@ -29,7 +29,7 @@ def _available() -> dict[str, tuple[Database, Path]]:
 DATABASES = _available()
 
 _SUMMARY = """## Writing queries
-`query` takes: domains (e.g. [["g", "Graph8"]]); output, a mapping from each result
+`query` takes: domains (e.g. [["g", "Graph"]]); output, a mapping from each result
 column name to the expression it returns (e.g. {"g6": "id(g)", "edges": "g.num_edges"});
 and optional condition, order ([expression, "asc"|"desc"] pairs, which may refer to the
 output column names), limit, and database. Expressions use fields (g.num_vertices),
@@ -102,7 +102,7 @@ def register(mcp: FastMCP) -> None:
     ) -> list[dict[str, object]]:
         """Run a MathQL query and return the matching rows.
 
-        domains: variable bindings, e.g. [["g", "Graph8"]].
+        domains: variable bindings, e.g. [["g", "Graph"]].
         output: a mapping from result column name to the expression it returns,
             e.g. {"g6": "id(g)", "edges": "g.num_edges"}.
         condition: a boolean expression over the bound variables (optional).

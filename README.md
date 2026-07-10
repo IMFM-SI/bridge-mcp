@@ -54,7 +54,7 @@ trees on five vertices:
 
 ```json
 {
-  "domains": [["g", "Graph8"]],
+  "domains": [["g", "Graph"]],
   "output": {"graph6": "g.graph6", "degree_sequence": "g.degree_sequence"},
   "condition": "g.num_vertices == 5 && g.is_tree"
 }
@@ -79,7 +79,7 @@ vertices (13,598 in all), each annotated with a selection of invariants — amon
 the number of vertices and edges, the degree sequence, the chromatic number, and the
 automorphism count. Every invariant is both
 queryable in a condition and returnable in the output; the graph itself is stored in
-graph6 encoding. The single domain is `Graph8` — call the `describe` tool for the full
+graph6 encoding. The single domain is `Graph` — call the `describe` tool for the full
 field list. The database is generated with nauty and networkx
 (see `bridge_mcp/generate/graphs.py`).
 

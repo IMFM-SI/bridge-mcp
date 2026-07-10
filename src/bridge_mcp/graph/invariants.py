@@ -3,7 +3,7 @@ database generator.
 
 `girth`, `minimal_coloring`/`chromatic_number`, and `automorphism_count` are the exact
 computations networkx does not provide directly; `all_invariants` bundles the full set the
-`Graph8` schema records, as JSON-serializable values.
+`Graph` schema records, as JSON-serializable values.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def automorphism_count(graph: networkx.Graph) -> int:
 
 
 def all_invariants(graph: networkx.Graph) -> dict[str, object]:
-    """The full `Graph8` invariant set as JSON-serializable values."""
+    """The full `Graph` invariant set as JSON-serializable values."""
     degree_list = degrees(graph)
     connected = networkx.is_connected(graph)
     return {

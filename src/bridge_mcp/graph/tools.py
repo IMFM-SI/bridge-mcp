@@ -50,7 +50,7 @@ def graph6_from_edges(num_vertices: int, edges: list[list[int]]) -> str:
     """Build a graph on vertices 0..num_vertices-1 with the given edges; return its graph6.
 
     The result encodes this labeling and is not necessarily nauty's canonical form, so it
-    need not equal the graph6 stored in the Graph8 database; to find a graph there, query by
+    need not equal the graph6 stored in the Graph database; to find a graph there, query by
     invariants or use `is_isomorphic`.
     """
     graph = networkx.Graph()
@@ -64,7 +64,7 @@ def graph6_from_adjacency(matrix: list[list[int]]) -> str:
     """Build a graph from a 0/1 adjacency matrix; return its graph6.
 
     The result is not necessarily nauty's canonical form, so it need not equal the graph6
-    stored in the Graph8 database (see `graph6_from_edges`).
+    stored in the Graph database (see `graph6_from_edges`).
     """
     n = len(matrix)
     graph = networkx.Graph()
@@ -118,7 +118,7 @@ def connected_components(graph6: str) -> list[list[int]]:
 
 
 def invariants(graph6: str) -> dict[str, object]:
-    """All `Graph8` invariants computed for the given graph: order, size, degree sequence,
+    """All `Graph` invariants computed for the given graph: order, size, degree sequence,
     regularity, components, connectivity, diameter, radius, girth, the tree/forest/
     bipartite/planar/eulerian flags, triangle count, clique number, independence number,
     chromatic number, and automorphism count."""
