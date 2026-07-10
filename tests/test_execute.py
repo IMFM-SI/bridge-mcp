@@ -14,7 +14,7 @@ DB = database_path()
 @pytest.fixture
 def connection() -> Iterator[sqlite3.Connection]:
     if not DB.exists():
-        pytest.skip(f"{DB} not present; run scripts/generate_graphs.py")
+        pytest.skip(f"{DB} not present; run python -m bridge_mcp.generate graphs")
     conn = sqlite3.connect(DB)
     yield conn
     conn.close()

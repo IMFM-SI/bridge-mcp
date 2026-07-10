@@ -97,14 +97,14 @@ def test_describe_includes_pibase_domains() -> None:
 def connection() -> Iterator[sqlite3.Connection]:
     path = database_path()
     if not path.exists():
-        pytest.skip(f"{path} not present; run scripts/generate_graphs.py")
+        pytest.skip(f"{path} not present; run python -m bridge_mcp.generate graphs")
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     generated = conn.execute(
         "SELECT name FROM sqlite_master WHERE name = 'pibase_space'"
     ).fetchone()
     if generated is None:
         conn.close()
-        pytest.skip("pibase tables not present; run scripts/generate_pibase.py")
+        pytest.skip("pibase tables not present; run python -m bridge_mcp.generate pibase")
     yield conn
     conn.close()
 

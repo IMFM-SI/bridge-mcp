@@ -81,7 +81,7 @@ automorphism count. Every invariant is both
 queryable in a condition and returnable in the output; the graph itself is stored in
 graph6 encoding. The single domain is `Graph8` — call the `describe` tool for the full
 field list. The database is generated with nauty and networkx
-(see `scripts/generate_graphs.py`).
+(see `bridge_mcp/generate/graphs.py`).
 
 ### Topological spaces (π-Base)
 
@@ -95,7 +95,7 @@ property, or theorem by name, alias, or statement, and `derivation` unfolds a tr
 full derivation tree down to the asserted facts. The data is © the
 [π-Base community](https://github.com/pi-base/data), licensed
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); regenerate the tables from
-the current published bundle with `python scripts/generate_pibase.py`.
+the current published bundle with `python -m bridge_mcp.generate pibase`.
 
 ### Maniplexes
 
