@@ -10,7 +10,13 @@ from collections.abc import Callable
 
 import networkx as nx
 
-from bridge_mcp.generate.common import DB_PATH, compact
+from bridge_mcp.generate.common import (
+    DB_PATH,
+    bridge_mcp_source,
+    compact,
+    record_provenance,
+    record_sources,
+)
 from bridge_mcp.graph.invariants import (
     automorphism_count,
     chromatic_number,
@@ -62,9 +68,9 @@ INVARIANTS: list[Invariant] = [
     ("automorphism_count", "INTEGER", automorphism_count),
 ]
 
-COLUMNS: list[tuple[str, str]] = [("graph6", "TEXT")] + [
-    (name, ty) for name, ty, _ in INVARIANTS
-]
+COLUMNS: list[tuple[str, str]] = (
+    [("graph6", "TEXT")] + [(name, ty) for name, ty, _ in INVARIANTS] + [("source", "TEXT")]
+)
 
 
 def generate(n: int) -> list[str]:
@@ -75,7 +81,33 @@ def generate(n: int) -> list[str]:
 
 def row_for(graph6: str) -> list[object]:
     graph = nx.from_graph6_bytes(graph6.encode("ascii"))
-    return [graph6] + [extract(graph) for _, _, extract in INVARIANTS]
+    return [graph6] + [extract(graph) for _, _, extract in INVARIANTS] + ["geng"]
+
+
+def record_graph_provenance(connection: sqlite3.Connection) -> None:
+    """The sources and field provenance of the graph domain."""
+    record_sources(
+        connection,
+        [
+            (
+                "geng",
+                "nauty geng",
+                None,
+                "exhaustive generation of non-isomorphic graphs on up to 8 vertices",
+                None,
+                "nauty, by Brendan McKay and Adolfo Piperno",
+            ),
+            ("networkx", "networkx", nx.__version__, "graph invariants", None, None),
+            bridge_mcp_source(),
+        ],
+    )
+    record_provenance(
+        connection,
+        ["Graph8"],
+        [("Graph8", "graph6", "geng", "graphs on up to 8 vertices")]
+        + [("Graph8", name, "networkx", "") for name, _, _ in INVARIANTS]
+        + [("Graph8", "source", "bridge-mcp", "bookkeeping")],
+    )
 
 
 def main(max_vertices: int = DEFAULT_MAX_VERTICES) -> None:
@@ -98,5 +130,7 @@ def main(max_vertices: int = DEFAULT_MAX_VERTICES) -> None:
         logging.info("n = %d: %d graphs, computing invariants", n, len(graph6s))
         connection.executemany(insert, (row_for(g6) for g6 in graph6s))
         connection.commit()
+    record_graph_provenance(connection)
+    connection.commit()
     connection.close()
     logging.info("done, wrote %s", DB_PATH)

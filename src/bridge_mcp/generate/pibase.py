@@ -12,10 +12,18 @@ import logging
 import sqlite3
 import urllib.request
 from collections.abc import Iterable, Mapping
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-from bridge_mcp.generate.common import DB_PATH, compact
+from bridge_mcp.generate.common import (
+    DB_PATH,
+    ProvenanceRow,
+    bridge_mcp_source,
+    compact,
+    record_provenance,
+    record_sources,
+)
 from bridge_mcp.pibase.deduction import database_closure, literals
 
 BUNDLE_URL = "https://pub-65041ca69d744da88ade13abd31ad834.r2.dev/refs/heads/main.json"
@@ -59,6 +67,32 @@ CREATE TABLE pibase_trait (
     FOREIGN KEY (property) REFERENCES pibase_property(uid),
     FOREIGN KEY (theorem) REFERENCES pibase_theorem(uid));
 """
+
+
+def provenance_rows() -> list[ProvenanceRow]:
+    """The field provenance of the π-Base domains."""
+    plain = {
+        "Space": ["uid", "name", "aliases", "description", "counterexamples_id", "refs"],
+        "Property": ["uid", "name", "aliases", "description", "refs"],
+        "Theorem": ["uid", "when_json", "then_json", "description", "refs"],
+        "Trait": ["space_uid", "property_uid", "description", "refs"],
+    }
+    return [
+        (domain, field, "pibase", "") for domain, fields in plain.items() for field in fields
+    ] + [
+        ("Theorem", "statement", "pibase", ""),
+        ("Theorem", "statement", "bridge-mcp", "rendered with property names"),
+        ("Trait", "value", "pibase", "asserted traits are π-Base's own"),
+        (
+            "Trait",
+            "value",
+            "bridge-mcp",
+            "derived traits are deduced from π-Base's theorems; see `asserted`",
+        ),
+        ("Trait", "asserted", "bridge-mcp", "bookkeeping"),
+        ("Trait", "theorem", "bridge-mcp", "the final derivation step; see `asserted`"),
+        ("Trait", "premises", "bridge-mcp", "the final derivation step; see `asserted`"),
+    ]
 
 
 def fetch_bundle(file: str | None) -> dict[str, Any]:
@@ -189,6 +223,22 @@ def main(file: str | None = None) -> None:
         theorem_rows(bundle["theorems"], names),
     )
     connection.executemany("INSERT INTO pibase_trait VALUES (?, ?, ?, ?, ?, ?, ?, ?)", traits)
+    sha = str(bundle.get("version", {}).get("sha", "unknown"))
+    record_sources(
+        connection,
+        [
+            (
+                "pibase",
+                "π-Base",
+                None,
+                "the community database of topological spaces (topology.pi-base.org)",
+                f"{date.today().isoformat()}, bundle {sha}",
+                "© the π-Base community, CC BY 4.0",
+            ),
+            bridge_mcp_source(),
+        ],
+    )
+    record_provenance(connection, ["Space", "Property", "Theorem", "Trait"], provenance_rows())
     connection.commit()
     connection.close()
     logging.info(

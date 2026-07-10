@@ -67,5 +67,6 @@ def test_describe() -> None:
     fields = {f["label"]: f["type"] for f in domains[0]["inputFields"]}
     assert fields["graph6"] == "string"
     assert fields["degree_sequence"] == "list int"
-    assert domains[0]["domainFields"] == []
+    links = {f["label"]: f["domain"] for f in domains[0]["domainFields"]}
+    assert links == {"source": "Source"}
     assert all("output" in e["query"] for e in described["examples"])
