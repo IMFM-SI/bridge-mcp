@@ -5,8 +5,9 @@ from mcp.server.fastmcp import FastMCP
 from bridge_mcp.graph import tools as graph_component
 from bridge_mcp.instructions import build_instructions
 from bridge_mcp.mathql import tools as mathql_component
+from bridge_mcp.pibase import tools as pibase_component
 
-COMPONENTS = (mathql_component, graph_component)
+COMPONENTS = (mathql_component, pibase_component, graph_component)
 
 
 def build() -> FastMCP:
