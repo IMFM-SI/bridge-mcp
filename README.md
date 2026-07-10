@@ -83,6 +83,20 @@ graph6 encoding. The single domain is `Graph8` — call the `describe` tool for 
 field list. The database is generated with nauty and networkx
 (see `scripts/generate_graphs.py`).
 
+### Topological spaces (π-Base)
+
+The `math_data` database also carries the [π-Base](https://topology.pi-base.org)
+community database of topology: domains `Space`, `Property`, and `Theorem`, and a
+`Trait` domain holding every space/property value that π-Base asserts *or that is
+derivable from its theorems* — 2,115 asserted plus some 50,000 derived traits, each
+derived one carrying its provenance (the theorem of its final derivation step and the
+premises consumed). Two tools accompany the domains: `search` fuzzy-finds a space,
+property, or theorem by name, alias, or statement, and `derivation` unfolds a trait's
+full derivation tree down to the asserted facts. The data is © the
+[π-Base community](https://github.com/pi-base/data), licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); regenerate the tables from
+the current published bundle with `python scripts/generate_pibase.py`.
+
 ### Maniplexes
 
 An optional database `sym_ob_small` holds 32,634 regular rank-4 maniplexes together
@@ -94,6 +108,14 @@ foreign keys: a `Maniplex` links to a `CanonicalLabeling`, which links to its `G
 `src/bridge_mcp/mathql/databases/sym-ob-small.db`, where the server picks it up.
 
 ## Available tools
+
+### π-Base tools
+
+`search` finds π-Base entities by approximate name — `search("hausdorf")` lands on
+`$T_2$` through its *Hausdorff* alias — returning the uids that MathQL queries need.
+`derivation` answers "why does this space have this property": it unfolds the stored
+provenance of a trait into the full derivation tree, each node a theorem application,
+each leaf a fact asserted by π-Base.
 
 ### Graph tools based on `networkx`
 

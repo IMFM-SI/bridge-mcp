@@ -50,3 +50,10 @@ If you install [nauty](https://pallini.di.uniroma1.it) you can regenerate the gr
     python scripts/generate_graphs.py
 
 The script assumes nauty's `geng` is on the `PATH`.
+
+The π-Base tables of the same database are regenerated with
+
+    python scripts/generate_pibase.py
+
+which fetches the current [π-Base](https://topology.pi-base.org) bundle, computes the
+deductive closure of its traits, and rebuilds the `pibase_*` tables in place.
