@@ -76,7 +76,9 @@ def fetch_bundle(file: str | None) -> dict[str, Any]:
         loaded: dict[str, Any] = json.loads(Path(file).read_text(encoding="utf-8"))
     else:
         logging.info("fetching %s", BUNDLE_URL)
-        with urllib.request.urlopen(BUNDLE_URL) as response:
+        # R2 rejects requests bearing urllib's default User-Agent.
+        request = urllib.request.Request(BUNDLE_URL, headers={"User-Agent": "bridge-mcp"})
+        with urllib.request.urlopen(request) as response:
             loaded = json.load(response)
     return loaded
 
