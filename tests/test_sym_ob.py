@@ -1,17 +1,15 @@
 """Checks for the sym_ob_small database: offline SQL rendering, and execution when
-`BRIDGE_MCP_SYM_OB_DB` points at the database file."""
+the database file is present (see the README)."""
 
-import os
 import sqlite3
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
-from bridge_mcp.mathql.databases.sym_ob_small import database
+from bridge_mcp.mathql.databases.sym_ob_small import database, database_path
 from bridge_mcp.mathql.execute import run_query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
@@ -76,9 +74,9 @@ def test_describe_lists_domain_fields() -> None:
 
 @pytest.fixture
 def connection() -> Iterator[sqlite3.Connection]:
-    path = os.environ.get("BRIDGE_MCP_SYM_OB_DB")
-    if path is None or not Path(path).exists():
-        pytest.skip("BRIDGE_MCP_SYM_OB_DB not set")
+    path = database_path()
+    if not path.exists():
+        pytest.skip(f"{path} not present")
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     yield conn
     conn.close()

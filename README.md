@@ -90,20 +90,8 @@ with their flag graphs, 1-skeleta, 1-coskeleta, and canonical labelings, connect
 foreign keys: a `Maniplex` links to a `CanonicalLabeling`, which links to its `Graph`
 (stored in sparse6 encoding), so a query can follow a chain such as
 `m.skeleton.graph.sparse6`. The file (≈ 298 MB) is not bundled; download it from
-<https://www.andrej.com/tmp/sym-ob-small.db> and point the `BRIDGE_MCP_SYM_OB_DB`
-environment variable at it. With Claude Desktop, set the variable in the server's
-stanza in the configuration file:
-
-```json
-{
-  "mcpServers": {
-    "bridge-mcp": {
-      "command": "⟨absolute-path⟩/bridge-mcp",
-      "env": { "BRIDGE_MCP_SYM_OB_DB": "⟨absolute-path⟩/sym-ob-small.db" }
-    }
-  }
-}
-```
+<https://www.andrej.com/tmp/sym-ob-small.db> and save it as
+`src/bridge_mcp/mathql/databases/sym-ob-small.db`, where the server picks it up.
 
 ## Available tools
 

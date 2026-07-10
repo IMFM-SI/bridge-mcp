@@ -2,9 +2,11 @@
 skeleta, and canonical labelings.
 
 `Maniplex` links through `CanonicalLabeling` to `Graph`, so reaching a maniplex's flag
-graph is a two-hop chain of domain fields. The file (about 298 MB) is not bundled;
-point `BRIDGE_MCP_SYM_OB_DB` at a downloaded copy.
+graph is a two-hop chain of domain fields.
 """
+
+from importlib import resources
+from pathlib import Path
 
 from bridge_mcp.mathql.database import Column, Database, Example, ForeignKey, Schema
 from bridge_mcp.mathql.types import (
@@ -15,6 +17,13 @@ from bridge_mcp.mathql.types import (
     StringType,
     Ty,
 )
+
+
+def database_path() -> Path:
+    """The database file's expected location, beside the bundled `math-data.db`."""
+    return Path(
+        str(resources.files("bridge_mcp.mathql.databases").joinpath("sym-ob-small.db"))
+    )
 
 
 def _columns(rows: tuple[tuple[str, str, Ty, str], ...]) -> dict[str, Column]:

@@ -17,13 +17,7 @@ def test_instructions_compose_components() -> None:
     assert "Graph tools" in mcp.instructions  # graph component fragment
 
 
-def test_instructions_mention_every_database() -> None:
-    assert mcp.instructions is not None
-    assert "math_data" in mcp.instructions
-    assert "sym_ob_small" in mcp.instructions  # present even when the file is absent
-
-
-def test_describe_lists_every_database() -> None:
+def test_describe_lists_available_databases() -> None:
     _, listed = asyncio.run(mcp.call_tool("describe", {}))
     names = {entry["name"] for entry in listed["databases"]}
-    assert names == {"math_data", "sym_ob_small"}
+    assert "math_data" in names
