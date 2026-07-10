@@ -61,7 +61,7 @@ def test_id_is_graph6() -> None:
 
 def test_describe() -> None:
     described: Any = database.describe()
-    assert described["overview"].startswith("All non-isomorphic")
+    assert described["overview"].startswith("Two collections")
     domains = described["domains"]
     assert domains[0]["name"] == "Graph8"
     fields = {f["label"]: f["type"] for f in domains[0]["inputFields"]}
