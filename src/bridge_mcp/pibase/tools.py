@@ -1,4 +1,4 @@
-"""The π-Base component: the `search` and `derivation` tools."""
+"""The `search` and `derivation` tools."""
 
 from __future__ import annotations
 
@@ -12,16 +12,16 @@ from rapidfuzz import fuzz, process, utils
 
 from bridge_mcp.mathql.execute import database_path
 
-INSTRUCTIONS = """## π-Base tools
-- `search` — fuzzy-find a space, property, or theorem by name; aliases and
-  misspellings match. Returns uids for use in MathQL queries against the
-  Space, Property, Trait, and Theorem domains.
-- `derivation` — the derivation tree of a trait: the provenance (theorem and
-  premises) of every derived step, down to the asserted facts."""
+INSTRUCTIONS = """## Search and derivation
+- `search` — fuzzy-find a π-Base space, property, or theorem, or a group, by
+  name; aliases and misspellings match. Returns uids for use in MathQL
+  queries (a group's uid is its [order, index] pair).
+- `derivation` — the derivation tree of a π-Base trait: the provenance
+  (theorem and premises) of every derived step, down to the asserted facts."""
 
-KINDS = ("space", "property", "theorem")
+KINDS = ("space", "property", "theorem", "group")
 
-Entry = tuple[str, str, str, str]
+Entry = tuple[str, object, str, str]
 """A searchable entry: kind, uid, display name, searched text."""
 
 
@@ -32,7 +32,7 @@ def _connect() -> sqlite3.Connection:
 @functools.cache
 def _catalog() -> tuple[Entry, ...]:
     """Every searchable string: spaces and properties under each of their names,
-    theorems under their statements."""
+    theorems under their statements, groups under their structure descriptions."""
     with contextlib.closing(_connect()) as connection:
         named = [
             (kind, row)
@@ -40,6 +40,9 @@ def _catalog() -> tuple[Entry, ...]:
             for row in connection.execute(f"SELECT uid, name, aliases FROM {table}")
         ]
         theorems = connection.execute("SELECT uid, statement FROM pibase_theorem").fetchall()
+        groups = connection.execute(
+            'SELECT "order", "index", structure_description FROM small_group'
+        ).fetchall()
     return tuple(
         [
             (kind, uid, name, text)
@@ -47,14 +50,15 @@ def _catalog() -> tuple[Entry, ...]:
             for text in [name, *json.loads(aliases)]
         ]
         + [("theorem", uid, statement, statement) for uid, statement in theorems]
+        + [("group", [order, index], name, name) for order, index, name in groups]
     )
 
 
 def search(text: str, kind: str | None = None, limit: int = 10) -> list[dict[str, object]]:
-    """Fuzzy-find π-Base spaces, properties, and theorems by name.
+    """Fuzzy-find π-Base spaces, properties, and theorems, and groups, by name.
 
     text: the name to look for; aliases and near-misses match too.
-    kind: restrict to "space", "property", or "theorem" (optional).
+    kind: restrict to "space", "property", "theorem", or "group" (optional).
     limit: maximum number of results.
     """
     if kind is not None and kind not in KINDS:
@@ -71,8 +75,8 @@ def search(text: str, kind: str | None = None, limit: int = 10) -> list[dict[str
     seen: set[tuple[str, str]] = set()
     for _, score, index in hits:
         entry_kind, uid, name, _ = entries[index]
-        if (entry_kind, uid) not in seen:
-            seen.add((entry_kind, uid))
+        if (entry_kind, repr(uid)) not in seen:
+            seen.add((entry_kind, repr(uid)))
             results.append(
                 {"kind": entry_kind, "uid": uid, "name": name, "score": round(score)}
             )

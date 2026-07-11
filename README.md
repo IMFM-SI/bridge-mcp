@@ -70,18 +70,32 @@ them with these tools.
 ## Databases
 
 The `query` and `describe` tools take a `database` parameter naming the database to
-use; calling `describe` with no arguments lists the available databases.
+use; calling `describe` with no arguments lists the available databases. Within a
+database, the `Source` and `Provenance` domains record which tools and upstream
+databases the facts rest on: a provenance row says that trusting its source suffices
+for the facts in that field.
 
-### Small graphs
+### Graphs
 
 The bundled database `math_data` holds every non-isomorphic simple graph on up to 8
-vertices (13,598 in all), each annotated with a selection of invariants — among them
-the number of vertices and edges, the degree sequence, the chromatic number, and the
-automorphism count. Every invariant is both
-queryable in a condition and returnable in the output; the graph itself is stored in
-graph6 encoding. The single domain is `Graph` — call the `describe` tool for the full
-field list. The database is generated with nauty and networkx
-(see `bridge_mcp/generate/graphs.py`).
+vertices (13,598 in all) together with the Cayley graphs of the group census, each
+annotated with invariants — the number of vertices and edges, the degree sequence,
+connectivity, planarity, and more. The exponential invariants (chromatic number,
+clique and independence numbers, automorphism count) are undefined for graphs on more
+than 8 vertices. Graphs are stored in canonical graph6 encoding (nauty's `labelg`),
+and each graph on up to 8 vertices links to its automorphism group in the census via
+`automorphism_group`, when that group has order at most 127. The domain is `Graph`.
+
+### Groups
+
+The same database carries GAP's SmallGroups census of the finite groups of order at
+most 127 (1,268 groups) as the `Group` domain, keyed by the GAP id — `Group[24, 12]`
+is S4. Each group records its structure description and a selection of invariants
+(abelianness, nilpotency and solvability, exponent, center and derived subgroup
+orders, abelianization, and more), and every group of order at most 100 links to the
+Cayley graph of its minimal generating set via `cayley_graph` — a graph shared with
+the `Graph` domain, so graph invariants of Cayley graphs are one join away. Computed
+with [GAP](https://www.gap-system.org) (The GAP Group, GPL).
 
 ### Topological spaces (π-Base)
 
@@ -109,13 +123,14 @@ foreign keys: a `Maniplex` links to a `CanonicalLabeling`, which links to its `G
 
 ## Available tools
 
-### π-Base tools
+### Search and derivation tools
 
-`search` finds π-Base entities by approximate name — `search("hausdorf")` lands on
-`$T_2$` through its *Hausdorff* alias — returning the uids that MathQL queries need.
-`derivation` answers "why does this space have this property": it unfolds the stored
-provenance of a trait into the full derivation tree, each node a theorem application,
-each leaf a fact asserted by π-Base.
+`search` finds π-Base entities and groups by approximate name — `search("hausdorf")`
+lands on `$T_2$` through its *Hausdorff* alias, `search("Q8")` on the quaternion
+group — returning the uids that MathQL queries need. `derivation` answers "why does
+this space have this property": it unfolds the stored provenance of a π-Base trait
+into the full derivation tree, each node a theorem application, each leaf a fact
+asserted by π-Base.
 
 ### Graph tools based on `networkx`
 

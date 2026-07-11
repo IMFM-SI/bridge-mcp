@@ -45,15 +45,12 @@ You can also run the following commands:
 * `ruff check .` – check the code with linter
 * `ruff format --check .` – check the source code formatting
 
-If you install [nauty](https://pallini.di.uniroma1.it) you can regenerate the graphs database with
+The bundled database regenerates end to end with
 
-    python -m bridge_mcp.generate graphs
+    python -m bridge_mcp.generate all --gap <path-to-gap>
 
-The script assumes nauty's `geng` is on the `PATH`.
-
-The π-Base tables of the same database are regenerated with
-
-    python -m bridge_mcp.generate pibase
-
-which fetches the current [π-Base](https://topology.pi-base.org) bundle, computes the
-deductive closure of its traits, and rebuilds the `pibase_*` tables in place.
+which needs [nauty](https://pallini.di.uniroma1.it) (`geng` and `labelg` on the
+`PATH`) and [GAP](https://www.gap-system.org). The individual targets — `graphs`,
+`pibase` (fetches the current [π-Base](https://topology.pi-base.org) bundle and
+computes the deductive closure), `groups`, `cayley`, and `autgroups` — rebuild their
+own tables inside the existing database; only `graphs` creates it afresh.

@@ -52,6 +52,14 @@ def test_search_respects_limit_and_kind() -> None:
         search("line", kind="bogus")
 
 
+def test_search_groups() -> None:
+    top = search("S4", kind="group")[0]
+    assert top["uid"] == [24, 12]
+    assert top["name"] == "S4"
+    quaternions = search("Q8", kind="group")[0]
+    assert quaternions["uid"] == [8, 4]
+
+
 def test_derivation_tree() -> None:
     tree: Any = derivation("S000149", "P000053")
     assert tree["space"] == "Two-sided long line"
