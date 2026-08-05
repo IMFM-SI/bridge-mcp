@@ -178,9 +178,13 @@ def check(ctx: Context, e: input_ast.Expr, ty: Ty) -> expr.Expr:
 def _check_domains(
     ctx: Context, domains: tuple[input_ast.Binding, ...]
 ) -> tuple[Context, tuple[query.Binding, ...]]:
-    for binding in domains:
+    """Check the domain bindings. The variables are distinct, so one binding of a variable
+    is in scope wherever the variable appears."""
+    for position, binding in enumerate(domains):
         if binding.domain not in ctx.domains:
             raise MathQLError(f"unknown domain {binding.domain}")
+        if any(earlier.var == binding.var for earlier in domains[:position]):
+            raise MathQLError(f"duplicate domain variable {binding.var}")
     extended = functools.reduce(
         lambda c, b: c.extend_domain_ident(b.var, b.domain), domains, ctx
     )

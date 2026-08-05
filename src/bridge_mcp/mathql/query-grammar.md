@@ -18,8 +18,8 @@ A query is a JSON object:
 }
 ```
 
-- `domains` (required) binds one or more variables, each ranging over a named
-  domain; several bindings form a join.
+- `domains` (required) binds one or more distinct variables, each ranging over a
+  named domain; several bindings form a join.
 - `output` (required) is an ordered list of `[name, expression]` pairs. Each name is
   a plain identifier, distinct from the other names, and names a result column whose
   value is the value of the expression. The list order is the column order of every

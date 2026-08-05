@@ -171,3 +171,21 @@ def test_output_column_names_are_distinct() -> None:
     assert _elaborates([("a", "g.n"), ("b", "h.n")], "true")
     assert _elaborates([("g", "g.n"), ("h", "h.n")], "true")  # a variable's name is free
     assert not _elaborates([("n", "g.n"), ("n", "h.n")], "true")
+
+
+def test_domain_variables_are_distinct() -> None:
+    def elaborates(domains: list[tuple[str, str]]) -> bool:
+        source = ast.Query(
+            domains=tuple(ast.Binding(var, domain) for var, domain in domains),
+            output=(("n", parse_expression("g.n")),),
+            condition=ast.BoolLit(True),
+        )
+        try:
+            check_query(TOY, source)
+        except MathQLError:
+            return False
+        return True
+
+    assert elaborates([("g", "Graph"), ("h", "Graph")])
+    assert not elaborates([("g", "Graph"), ("g", "Graph")])
+    assert not elaborates([("g", "Graph"), ("g", "Maniplex")])
