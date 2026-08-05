@@ -263,9 +263,8 @@ def _render_join(join: Join) -> str:
 
 
 def _render_from(q: Query) -> str:
-    """The `FROM` clause. A query over no table has none, and a hoisted join over no
-    table takes `(SELECT 1)`, a source of one row, as the left operand `LEFT JOIN`
-    requires."""
+    """The `FROM` clause: the tables with their aliases, absent for a query over no
+    table, and `(SELECT 1)` where a hoisted join stands over no table."""
     if q.froms:
         return " FROM " + ", ".join(
             f"{render_ident(table)} AS {render_ident(alias)}" for table, alias in q.froms
@@ -280,7 +279,7 @@ def render_query(q: Query) -> str:
     """Render a query to SQLite text, with a bare condition. Each output column is
     rendered as `<expr> AS <alias>`; a hoisted join renders as `LEFT JOIN`, so when it
     matches no row its columns are NULL. A query naming no output column selects `1`,
-    the smallest select list SQL admits, which `_decode_row` passes over."""
+    which `_decode_row` passes over."""
     joins = "".join(_render_join(join) for join in q.joins)
     columns = (
         ", ".join(f"{render(e)} AS {render_ident(alias)}" for e, alias in q.output)

@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS provenance (
 
 
 def compact(value: object) -> str:
-    """Minified JSON, comparing equal to SQLite's `json_array` output."""
-    return json.dumps(value, separators=(",", ":"))
+    """Minified JSON in UTF-8, comparing equal to SQLite's `json_array` output."""
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
 
 
 def bridge_mcp_source() -> SourceRow:

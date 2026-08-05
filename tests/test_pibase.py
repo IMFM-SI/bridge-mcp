@@ -179,3 +179,22 @@ def test_table_sizes(connection: sqlite3.Connection) -> None:
     assert spaces >= 200
     assert traits >= 40000
     assert 0 < derived < traits
+
+
+def test_a_non_ascii_reference_compares_in_both_stages(connection: sqlite3.Connection) -> None:
+    """A stored list holding UTF-8 text answers alike in a condition and in postprocess."""
+    reference = "zb:0386.54001 — Counterexamples in Topology"
+    rows = rows_by_name(
+        connection,
+        database,
+        {
+            "domains": [["t", "Trait"]],
+            "output": [["refs", "t.refs"], ["in_sql", f"t.refs == ['{reference}']"]],
+            "condition": f"t.refs == ['{reference}']",
+            "postprocess": [["in_post", f"refs == ['{reference}']"]],
+            "limit": 5,
+        },
+    )
+    assert rows
+    assert all(row["refs"] == [reference] for row in rows)
+    assert all(row["in_sql"] is True and row["in_post"] is True for row in rows)

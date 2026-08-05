@@ -193,6 +193,8 @@ VALUES: list[object] = [
     ["it's"],
     ["a\nb\t"],
     ["été"],
+    ["日本語", "🜛"],
+    ["e\u0301galite\u0301"],
 ]
 
 

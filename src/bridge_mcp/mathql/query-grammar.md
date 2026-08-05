@@ -73,7 +73,7 @@ type ::= "int"
 
 - `int` — integers.
 - `bool` — the truth values `true` and `false`.
-- `string` — text.
+- `string` — text in UTF-8; a value may carry any character.
 - `list` τ — an ordered list of values of type τ.
 - a product `τ₁ * … * τₙ` — a tuple of components of the given types; the nullary
   product is the unit type.
@@ -124,6 +124,10 @@ A `variable`, an `expr . field` on a domain field, and a `domain[…]` denote
 *objects*; they appear only under `id` or as the head of a further projection. A
 query that returns or compares a bare object is ill-typed.
 
+Every identifier — a variable, a column name, a domain name, a field label, a constant
+and a function — is ASCII: a letter followed by letters, digits and `_`. UTF-8 text
+belongs in string literals and in the values a database holds.
+
 The meaning and types of the above expressions is as follows:
 
 - `if c then a else b` — evaluates to `a` when `c` is true and to `b` otherwise; `c` must be
@@ -149,8 +153,8 @@ The meaning and types of the above expressions is as follows:
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
 - `42` – integer literal of type `int`
-- `'text'` – string literal of type `string`; a literal single quote is written by
-  doubling it (`'it''s'`).
+- `'text'` – string literal of type `string`, holding any UTF-8 text; a literal single
+  quote is written by doubling it (`'it''s'`).
 - `true` and `false` – truth values of type `bool`
 - `x` — a variable, denoting the object it is bound to.
 - `x.field` — the field `field` of the object `x`: an input field yields its scalar
