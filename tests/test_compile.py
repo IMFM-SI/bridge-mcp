@@ -5,43 +5,15 @@ import pytest
 
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
-from bridge_mcp.mathql.database import Column, Database, ForeignKey, Schema, SqlFunction
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.query import Query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
-from bridge_mcp.mathql.types import BoolType, IntType, StringType
-
-GRAPH = Schema(
-    table="graph",
-    columns={
-        "graph6": Column("graph6", StringType(), True, ""),
-        "n": Column("n", IntType(), False, ""),
-        "planar": Column("planar", BoolType(), False, ""),
-    },
-    foreign_keys={},
-    doc="",
-)
-MANIPLEX = Schema(
-    table="maniplex",
-    columns={
-        "mid": Column("mid", IntType(), True, ""),
-        "size": Column("size", IntType(), False, ""),
-    },
-    foreign_keys={"skeleton": ForeignKey("Graph", (("skeleton_graph6", "graph6"),), "")},
-    doc="",
-)
-TOY = Database(
-    overview="toy",
-    constants=(),
-    domains={"Graph": GRAPH, "Maniplex": MANIPLEX},
-    examples=(),
-    sql_functions=(SqlFunction("size", (StringType(),), IntType(), "length"),),
-)
+from tests.toy import DATABASE as TOY
 
 
 def _typed(request: dict[str, object]) -> Query:
-    return check_query(TOY.context(), from_json(request))
+    return check_query(TOY, from_json(request))
 
 
 def _rendered(request: dict[str, object]) -> str:
@@ -181,3 +153,15 @@ def test_a_call_is_legal_in_an_order_key() -> None:
         }
     )
     assert rendered.endswith('ORDER BY "length"("g"."graph6") DESC')
+
+
+def test_postprocess_contributes_nothing_to_the_sql() -> None:
+    rendered = _rendered(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.n"]],
+            "postprocess": [["k", "plus(n, 1)"]],
+        }
+    )
+    assert '"n"' in rendered
+    assert '"k"' not in rendered

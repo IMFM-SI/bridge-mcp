@@ -8,12 +8,13 @@ Ill-typed input raises `MathQLError`, located by the offending node's source spa
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TypeVar, assert_never
 
 from bridge_mcp.mathql import expr, query
 from bridge_mcp.mathql import input as input_ast
 from bridge_mcp.mathql.context import Context
+from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.types import (
     BoolType,
@@ -196,18 +197,47 @@ def _order_entry(ctx: Context, entry: input_ast.OrderEntry) -> query.OrderEntry:
     return query.OrderEntry(typed, entry.direction)
 
 
-def check_query(ctx: Context, source: input_ast.Query) -> query.Query:
+def _extend_output(ctx: Context, output: tuple[query.OutputColumn, ...]) -> Context:
+    """Bring the output columns into scope, each at its inferred type."""
+    return functools.reduce(lambda c, o: c.extend_ident(o.name, o.ty), output, ctx)
+
+
+def _check_postprocess(
+    ctx: Context, entries: Sequence[tuple[str, input_ast.Expr]]
+) -> tuple[query.OutputColumn, ...]:
+    """Check the postprocess entries in order, each in scope of the output columns and of
+    the entries preceding it. A name already in scope is a duplicate."""
+    match entries:
+        case []:
+            return ()
+        case [(name, e), *rest]:
+            if name in ctx.idents:
+                raise _error(f"duplicate field {name} in postprocess", e)
+            ty, typed = infer(ctx, e)
+            return (
+                query.OutputColumn(name, ty, typed),
+                *_check_postprocess(ctx.extend_ident(name, ty), rest),
+            )
+    raise AssertionError("unreachable")
+
+
+def check_query(database: Database, source: input_ast.Query) -> query.Query:
     """Type-check a query, elaborating it into the typed query.
 
-    The output columns are checked independently — one may not refer to another — and
-    the order keys are checked with the output aliases in scope.
+    The output columns are checked in the context of the domain variables, the order keys
+    with the output aliases in scope, and the postprocess entries in the postprocess
+    context extended by the output columns.
     """
-    ctx, bindings = _check_domains(ctx, source.domains)
+    ctx, bindings = _check_domains(database.sql_context(), source.domains)
     condition_source = (
         source.condition if source.condition is not None else input_ast.BoolLit(True)
     )
     condition = check(ctx, condition_source, BoolType())
     output = tuple(_output_column(ctx, name, e) for name, e in source.output)
-    extended = functools.reduce(lambda c, o: c.extend_ident(o.name, o.ty), output, ctx)
-    order = tuple(_order_entry(extended, entry) for entry in source.order or ())
-    return query.Query(bindings, output, condition, order, source.limit)
+    order = tuple(
+        _order_entry(_extend_output(ctx, output), entry) for entry in source.order or ()
+    )
+    postprocess = _check_postprocess(
+        _extend_output(database.post_context(), output), source.postprocess
+    )
+    return query.Query(bindings, output, condition, order, source.limit, postprocess)

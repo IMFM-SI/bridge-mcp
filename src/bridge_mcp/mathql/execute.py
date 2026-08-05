@@ -80,4 +80,4 @@ def run_query(
     connection: sqlite3.Connection, database: Database, request: Mapping[str, Any]
 ) -> list[list[tuple[str, object]]]:
     """Parse, type-check, compile, and run a query from its JSON form."""
-    return run(connection, database, check_query(database.context(), from_json(request)))
+    return run(connection, database, check_query(database, from_json(request)))

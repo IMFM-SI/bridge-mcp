@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from bridge_mcp.mathql import sql
@@ -83,6 +83,21 @@ class SqlFunction:
 
 
 @dataclass(frozen=True)
+class PostFunction:
+    """A function callable in the postprocess clause: its MathQL name, its signature, and
+    an implementation over the decoded argument values, raising `MathQLError` on an
+    argument it rejects."""
+
+    name: str
+    arg_types: tuple[Ty, ...]
+    result_ty: Ty
+    implementation: Callable[[Sequence[object]], object]
+
+    def signature(self) -> Signature:
+        return Signature(self.arg_types, self.result_ty)
+
+
+@dataclass(frozen=True)
 class Example:
     note: str
     query: Mapping[str, object]
@@ -95,6 +110,7 @@ class Database:
     domains: Mapping[str, Schema]
     examples: tuple[Example, ...]
     sql_functions: tuple[SqlFunction, ...] = ()
+    post_functions: tuple[PostFunction, ...] = ()
 
     def domain_context(self) -> dict[str, DomainTy]:
         return {
@@ -108,12 +124,22 @@ class Database:
             for name, schema in self.domains.items()
         }
 
-    def context(self) -> Context:
+    def sql_context(self) -> Context:
+        """The context of the condition, the output, and the order."""
         idents: dict[str, Entry] = {c.name: TypeEntry(c.ty) for c in self.constants}
         return Context(
             domains=self.domain_context(),
             idents=idents,
             functions={f.name: f.signature() for f in self.sql_functions},
+        )
+
+    def post_context(self) -> Context:
+        """The context of the postprocess clause: the postprocess functions, to which the
+        type-checker adds the output columns."""
+        return Context(
+            domains={},
+            idents={},
+            functions={f.name: f.signature() for f in self.post_functions},
         )
 
     def describe(self) -> dict[str, object]:

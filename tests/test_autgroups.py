@@ -21,7 +21,7 @@ def test_multi_column_join_renders() -> None:
         "output": [["aut", "g.automorphism_group.structure_description"]],
     }
     rendered = sql.render_query(
-        compile_query(database, check_query(database.context(), from_json(request)))
+        compile_query(database, check_query(database, from_json(request)))
     )
     assert (
         'LEFT JOIN "small_group" AS "g_automorphism_group"'

@@ -39,3 +39,4 @@ class Query:
     condition: expr.Expr
     order: tuple[OrderEntry, ...]
     limit: int | None
+    postprocess: tuple[OutputColumn, ...] = ()

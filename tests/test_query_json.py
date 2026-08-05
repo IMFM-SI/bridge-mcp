@@ -84,3 +84,35 @@ def test_errors() -> None:
         )
     with pytest.raises(MathQLError):
         from_json({"domains": [["g", "G"]], "output": [["n", "g.n"]], "limit": -1})
+
+
+def test_postprocess_decoding() -> None:
+    q = from_json(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.num_vertices"]],
+            "postprocess": [["k", "plus(n, 1)"], ["m", "k"]],
+        }
+    )
+    assert [name for name, _ in q.postprocess] == ["k", "m"]
+    assert q.postprocess[1] == ("m", ast.Ident("k"))
+
+
+def test_postprocess_defaults_to_the_empty_stage() -> None:
+    q = from_json({"domains": [["g", "Graph"]], "output": [["n", "g.num_vertices"]]})
+    assert q.postprocess == ()
+
+
+def test_postprocess_errors() -> None:
+    base: dict[str, object] = {
+        "domains": [["g", "Graph"]],
+        "output": [["n", "g.num_vertices"]],
+    }
+    with pytest.raises(MathQLError):
+        from_json({**base, "postprocess": {"k": "plus(n, 1)"}})  # an object, not a list
+    with pytest.raises(MathQLError):
+        from_json({**base, "postprocess": None})
+    with pytest.raises(MathQLError):
+        from_json({**base, "postprocess": [["k"]]})
+    with pytest.raises(MathQLError):
+        from_json({**base, "postprocess": [["if", "3"]]})

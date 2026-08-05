@@ -10,9 +10,7 @@ from bridge_mcp.mathql.typecheck import check_query
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(
-        compile_query(database, check_query(database.context(), from_json(request)))
-    )
+    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
 
 
 def test_render_simple() -> None:

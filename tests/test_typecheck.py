@@ -3,29 +3,15 @@
 import pytest
 
 from bridge_mcp.mathql import input as ast
-from bridge_mcp.mathql.context import Context, DomainTy, InputField, Signature
+from bridge_mcp.mathql.context import Context
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.operators import Direction
 from bridge_mcp.mathql.parser import parse_expression
 from bridge_mcp.mathql.typecheck import check_query, infer
 from bridge_mcp.mathql.types import BoolType, IntType, StringType
+from tests.toy import DATABASE as TOY
 
-GRAPH = DomainTy(
-    input_fields={
-        "graph6": InputField(StringType(), True),
-        "n": InputField(IntType(), False),
-        "planar": InputField(BoolType(), False),
-    },
-    domain_fields={},
-)
-MANIPLEX = DomainTy(
-    input_fields={"mid": InputField(IntType(), True), "size": InputField(IntType(), False)},
-    domain_fields={"skeleton": "Graph"},
-)
-TOY = Context(
-    domains={"Graph": GRAPH, "Maniplex": MANIPLEX},
-    functions={"size": Signature((StringType(),), IntType())},
-)
+CONTEXT: Context = TOY.sql_context()
 
 
 def _query(
@@ -92,7 +78,7 @@ def test_order_sees_output_aliases() -> None:
 
 
 def test_domain_fields() -> None:
-    ctx = TOY.extend_domain_ident("m", "Maniplex")
+    ctx = CONTEXT.extend_domain_ident("m", "Maniplex")
     int_ty, _ = infer(ctx, parse_expression("m.skeleton.n"))
     assert int_ty == IntType()
     string_ty, _ = infer(ctx, parse_expression("id(m.skeleton)"))
@@ -109,7 +95,7 @@ def test_lists_and_tuples() -> None:
 
 
 def test_infer_directly() -> None:
-    ctx = TOY.extend_domain_ident("g", "Graph")
+    ctx = CONTEXT.extend_domain_ident("g", "Graph")
     int_ty, _ = infer(ctx, parse_expression("g.n + 1"))
     assert int_ty == IntType()
     bool_ty, _ = infer(ctx, parse_expression("g.planar && g.n > 0"))
@@ -127,6 +113,55 @@ def test_function_calls() -> None:
 
 
 def test_a_call_denotes_no_object() -> None:
-    ctx = TOY.extend_domain_ident("g", "Graph")
+    ctx = CONTEXT.extend_domain_ident("g", "Graph")
     with pytest.raises(MathQLError):
         infer(ctx, parse_expression("size(g.graph6).n"))
+
+
+def _post_elaborates(output: list[tuple[str, str]], post: list[tuple[str, str]]) -> bool:
+    """Does a query with the given output and postprocess entries type-check?"""
+    source = ast.Query(
+        domains=(ast.Binding("g", "Graph"), ast.Binding("h", "Graph")),
+        output=tuple((name, parse_expression(e)) for name, e in output),
+        condition=ast.BoolLit(True),
+        postprocess=tuple((name, parse_expression(e)) for name, e in post),
+    )
+    try:
+        check_query(TOY, source)
+    except MathQLError:
+        return False
+    return True
+
+
+def test_postprocess_well_formed() -> None:
+    assert _post_elaborates([("n", "g.n")], [("k", "3")])
+    assert _post_elaborates([("n", "g.n")], [("k", "n")])
+    assert _post_elaborates([("n", "g.n")], [("k", "plus(n, 1)")])
+    assert _post_elaborates([("n", "g.n")], [])
+
+
+def test_postprocess_is_scoped_in_order() -> None:
+    assert _post_elaborates([("n", "g.n")], [("k", "plus(n, 1)"), ("m", "plus(k, 2)")])
+    assert not _post_elaborates([("n", "g.n")], [("k", "plus(m, 1)"), ("m", "n")])
+
+
+def test_postprocess_names_are_fresh() -> None:
+    assert not _post_elaborates([("n", "g.n")], [("n", "3")])  # shadows an output column
+    assert not _post_elaborates([("n", "g.n")], [("k", "3"), ("k", "4")])  # rebinds an entry
+
+
+def test_postprocess_checks_calls() -> None:
+    assert not _post_elaborates([("n", "g.n")], [("k", "plus(1)")])
+    assert not _post_elaborates([("n", "g.n")], [("k", "plus(1, 2, 3)")])
+    assert not _post_elaborates([("s", "id(g)")], [("k", "plus(s, 1)")])  # s is a string
+    assert not _post_elaborates([("n", "g.n")], [("k", "bogus(1, 2)")])
+    assert not _post_elaborates([("n", "g.n")], [("k", "plus(zzz, 1)")])
+
+
+def test_the_two_function_tables_are_separate() -> None:
+    assert not _elaborates([("n", "g.n")], "plus(g.n, 1) > 3")  # plus runs after SQL
+    assert not _post_elaborates([("s", "id(g)")], [("k", "size(s)")])  # size compiles to SQL
+
+
+def test_postprocess_sees_no_domain_variables() -> None:
+    assert not _post_elaborates([("n", "g.n")], [("k", "g.n")])

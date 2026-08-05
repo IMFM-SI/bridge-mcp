@@ -2,7 +2,7 @@
 
 The JSON shape used over the MCP interface:
 `{"domains": [[v, d], ...], "output": [[name, "e"], ...], "condition": "...",
-  "order": [["e", "asc"], ...], "limit": n}`.
+  "order": [["e", "asc"], ...], "limit": n, "postprocess": [[name, "e"], ...]}`.
 """
 
 from __future__ import annotations
@@ -90,4 +90,7 @@ def from_json(data: Mapping[str, Any]) -> input_ast.Query:
         if data.get("order") is not None
         else None
     )
-    return input_ast.Query(domains, output, condition, order, _limit(data.get("limit")))
+    postprocess = _entries("postprocess", data["postprocess"]) if "postprocess" in data else ()
+    return input_ast.Query(
+        domains, output, condition, order, _limit(data.get("limit")), postprocess
+    )
