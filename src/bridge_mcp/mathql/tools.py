@@ -32,14 +32,16 @@ _SUMMARY = """## Writing queries
 `query` takes: domains (e.g. [["g", "Graph"]]); output, a list of [column name,
 expression] pairs in the order the columns are to appear (e.g. [["g6", "id(g)"],
 ["edges", "g.num_edges"]]); and optional condition, order ([expression, "asc"|"desc"]
-pairs, which may refer to the output column names), limit, and database. Each returned
-row is a list of [column name, value] pairs in that same order. Expressions use fields
-(g.num_vertices),
-id(x) for an object's primary key, literals, arithmetic (+ - *), comparisons
-(== != < <= > >=), booleans (&& || !), and defined/undefined for absence; a comparison
-needs both sides the same type. String literals are single-quoted ('text', a literal
-quote doubled as ''). ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the
-`grammar` tool for the full grammar."""
+pairs, which may refer to the output column names), limit, postprocess, and database.
+The postprocess entries are [column name, expression] pairs appended to each row and
+computed after the rows come back, each expression over the output columns and any
+earlier entry. Each returned row is a list of [column name, value] pairs: the output
+columns in their order, then the postprocess columns in theirs. Expressions use fields
+(g.num_vertices), id(x) for an object's primary key, literals, arithmetic (+ - *),
+comparisons (== != < <= > >=), booleans (&& || !), and defined/undefined for absence;
+a comparison needs both sides the same type. String literals are single-quoted ('text',
+a literal quote doubled as ''). ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work.
+Call the `grammar` tool for the full grammar."""
 
 
 def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
@@ -100,12 +102,13 @@ def register(mcp: FastMCP) -> None:
         condition: str | None = None,
         order: list[tuple[str, Literal["asc", "desc"]]] | None = None,
         limit: int | None = None,
+        postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
     ) -> list[list[tuple[str, Any]]]:
         """Run a MathQL query and return the matching rows.
 
-        Each row is a list of [column name, value] pairs, the output columns in
-        their given order.
+        Each row is a list of [column name, value] pairs: the output columns in
+        their given order, then the postprocess columns in theirs.
 
         domains: variable bindings, e.g. [["g", "Graph"]].
         output: [column name, expression] pairs, in the order the columns are to
@@ -115,6 +118,9 @@ def register(mcp: FastMCP) -> None:
         order: [expression, "asc"|"desc"] pairs; the expressions may refer to the
             output column names (optional).
         limit: maximum number of rows (optional).
+        postprocess: [column name, expression] pairs appended to each row and
+            computed after the rows come back, each expression over the output
+            columns and any earlier entry (optional).
         database: which database to query (optional; `describe` with an empty
             argument list returns the list, the first entry being the default).
         """
@@ -126,6 +132,8 @@ def register(mcp: FastMCP) -> None:
             request["order"] = order
         if limit is not None:
             request["limit"] = limit
+        if postprocess is not None:
+            request["postprocess"] = postprocess
         try:
             with contextlib.closing(
                 sqlite3.connect(f"file:{path}?mode=ro", uri=True)

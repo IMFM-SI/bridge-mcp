@@ -50,14 +50,27 @@ SQL, then run against the database that holds the objects. Each row comes back a
 list of column-name/value pairs. Queries are submitted as JSON through the `query`
 tool; the output, condition, and ordering are written in a familiar expression syntax —
 fields (`g.num_edges`), `id(g)` for an object's primary key, arithmetic, comparisons,
-`&&`/`||`/`!`, `defined`/`undefined`, and list and tuple literals. For example, the
-trees on five vertices:
+`&&`/`||`/`!`, `defined`/`undefined`, list and tuple literals, and calls to the
+functions a database declares. For example, the trees on five vertices:
 
 ```json
 {
   "domains": [["g", "Graph"]],
   "output": [["graph6", "g.graph6"], ["degree_sequence", "g.degree_sequence"]],
   "condition": "g.num_vertices == 5 && g.is_tree"
+}
+```
+
+A query may close with a `postprocess` clause: further columns, appended to every row
+and computed after the rows come back rather than by the database. The entries are
+scoped in order, so each may name the output columns and any entry before it.
+
+```json
+{
+  "domains": [["g", "Graph"]],
+  "output": [["graph6", "g.graph6"], ["max", "g.max_degree"], ["min", "g.min_degree"]],
+  "condition": "g.num_vertices == 5",
+  "postprocess": [["spread", "max - min"], ["regular", "spread == 0"]]
 }
 ```
 
