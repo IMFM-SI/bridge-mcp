@@ -9,15 +9,16 @@ import pytest
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.rows import rows_by_name
 
 
 def test_multi_column_join_renders() -> None:
     request: dict[str, Any] = {
         "domains": [["g", "Graph"]],
-        "output": {"aut": "g.automorphism_group.structure_description"},
+        "output": [["aut", "g.automorphism_group.structure_description"]],
     }
     rendered = sql.render_query(
         compile_query(database, check_query(database.context(), from_json(request)))
@@ -46,12 +47,12 @@ def connection() -> Iterator[sqlite3.Connection]:
 
 
 def test_triangle_has_automorphism_group_s3(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Graph"]],
-            "output": {"aut": "g.automorphism_group.structure_description"},
+            "output": [["aut", "g.automorphism_group.structure_description"]],
             "condition": "g.graph6 == 'Bw'",
         },
     )
@@ -59,12 +60,12 @@ def test_triangle_has_automorphism_group_s3(connection: sqlite3.Connection) -> N
 
 
 def test_path_graph_has_automorphism_group_c2(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Graph"]],
-            "output": {"aut": "g.automorphism_group.structure_description"},
+            "output": [["aut", "g.automorphism_group.structure_description"]],
             "condition": "g.num_vertices == 4 && g.is_tree && g.degree_sequence == [2, 2, 1, 1]",
         },
     )
@@ -72,12 +73,12 @@ def test_path_graph_has_automorphism_group_c2(connection: sqlite3.Connection) ->
 
 
 def test_complete_graph_k8_exceeds_the_census(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Graph"]],
-            "output": {"count": "g.automorphism_count"},
+            "output": [["count", "g.automorphism_count"]],
             "condition": (
                 "g.num_vertices == 8 && g.num_edges == 28"
                 " && undefined id(g.automorphism_group)"
@@ -98,15 +99,15 @@ def test_group_order_agrees_with_the_count(connection: sqlite3.Connection) -> No
 
 
 def test_graphs_with_nonabelian_automorphism_group(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Graph"]],
-            "output": {
-                "graph6": "g.graph6",
-                "aut": "g.automorphism_group.structure_description",
-            },
+            "output": [
+                ["graph6", "g.graph6"],
+                ["aut", "g.automorphism_group.structure_description"],
+            ],
             "condition": "!g.automorphism_group.is_abelian && g.is_connected",
             "limit": 5,
         },

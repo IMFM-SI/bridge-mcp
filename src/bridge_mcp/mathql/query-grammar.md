@@ -1,7 +1,7 @@
 # MathQL query grammar
 
 This document describes the grammar of the MathQL query language: the structure of a
-query and the expressions that appear in its condition and ordering.
+query, the expressions that appear in its clauses, and the shape of its results.
 
 ## Queries
 
@@ -9,26 +9,40 @@ A query is a JSON object:
 
 ```
 {
-  "domains":   [[variable, domain], ...],
-  "output":    { name: "<expression>", ... },
-  "condition": "<expression>",
-  "order":     [["<expression>", "asc" | "desc"], ...],
-  "limit":     <integer>
+  "domains":     [[variable, domain], ...],
+  "output":      [[name, "<expression>"], ...],
+  "condition":   "<expression>",
+  "order":       [["<expression>", "asc" | "desc"], ...],
+  "limit":       <integer>,
+  "postprocess": [[name, "<expression>"], ...]
 }
 ```
 
 - `domains` (required) binds one or more variables, each ranging over a named
   domain; several bindings form a join.
-- `output` (required) maps each result column name (a plain identifier) to the
-  expression whose value that column returns; the expressions use the same
-  grammar as `condition`. The output expressions are independent of one
-  another: one may not refer to another's column name.
+- `output` (required) is an ordered list of `[name, expression]` pairs. Each name is
+  a plain identifier and names a result column whose value is the value of the
+  expression. The list order is the column order of every row. Each output
+  expression may refer to the variables bound by `domains`.
 - `condition` (optional, default `true`) restricts the result to the objects, or
   tuples of objects, that satisfy it; it must have type `bool`.
 - `order` (optional) sorts the result by one or more scalar expressions, each
   ascending or descending; an order expression may refer to the output columns
   by name.
 - `limit` (optional) bounds the number of rows returned.
+- `postprocess` (optional, default empty) is an ordered list of `[name, expression]`
+  pairs, each appended to every row as a further column, evaluated outside the
+  database after it returns the rows. Each name is a plain identifier, distinct from
+  the output column names and from the names of the other entries. Each expression may
+  refer to the output columns and to the entries preceding it, so the list order
+  determines the names in scope. A postprocess column whose expression fails to
+  evaluate has the value `null`.
+
+## Results
+
+A query returns the matching rows. Each row is a list of `[name, value]` pairs: the
+output columns in the order `output` names them, then the postprocess columns in the
+order `postprocess` names them. An absent value is `null`.
 
 ## Domains
 
@@ -64,13 +78,13 @@ type ::= "int"
 - a product `τ₁ * … * τₙ` — a tuple of components of the given types; the nullary
   product is the unit type.
 
-Types are never written down in a query, but may appear in error messages.
+A query is written without type annotations; types appear in error messages.
 
 ## Expressions
 
-The output, condition, and order expressions are written in the following grammar. It is
-ambiguous as written, but the clauses are written in the order of precedence.
-Precedence and associativity are described in detail in **Precedence and associativity** below.
+Expressions in every clause follow the grammar summarized below. The alternatives
+appear in order of precedence; **Precedence and associativity** gives the precedence
+levels and the associativity of each operator.
 
 ```
 expr ::= "if" expr "then" expr "else" expr
@@ -98,6 +112,7 @@ expr ::= "if" expr "then" expr "else" expr
        | variable
        | domain "[" expr "," … "," expr "]"
        | "id" "(" expr ")"
+       | function "(" expr "," … "," expr ")"
        | constant
        | "(" expr ")"
        | "(" expr "," … "," expr ")"
@@ -106,8 +121,8 @@ expr ::= "if" expr "then" expr "else" expr
 ```
 
 A `variable`, an `expr . field` on a domain field, and a `domain[…]` denote
-*objects*, not scalars; they appear only under `id` or as the head of a further
-projection. A query that returns or compares a bare object is ill-typed.
+*objects*; they appear only under `id` or as the head of a further projection. A
+query that returns or compares a bare object is ill-typed.
 
 The meaning and types of the above expressions is as follows:
 
@@ -121,10 +136,16 @@ The meaning and types of the above expressions is as follows:
 - `e1 + e2`, `e1 - e2`, `e1 * e2`, and `- e` — integer arithmetic; the operands and
   the result are `int`.
 - `! e` — boolean negation; the operand and the result are `bool`.
-- `defined e` and `undefined e` — test whether `e` has a value or is absent; the
-  result is `bool`.
+- `defined e` and `undefined e` — of type `bool`. `defined e` is `true` when `e`
+  evaluates to a value other than `null`, and `false` when `e` evaluates to `null`
+  and when evaluating `e` fails. `undefined e` is `true` in exactly the cases where
+  `defined e` is `false`.
 - `id(e)` — the primary key of the object `e`: for a single-column key, that
   column's value; otherwise the tuple of its components.
+- `f(e₁, …, eₙ)` — the function `f` applied to the given arguments; its type is `f`'s
+  declared result type. Each database declares its functions in two groups: those
+  available in `condition`, `output` and `order`, and those available in
+  `postprocess`.
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
 - `42` – integer literal of type `int`

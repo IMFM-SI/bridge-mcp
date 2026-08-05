@@ -225,7 +225,7 @@ database = Database(
             "orientable polytopal maniplexes of type (4, 8, 8)",
             {
                 "domains": [["m", "Maniplex"]],
-                "output": {"id": "id(m)", "flags": "m.num_flags"},
+                "output": [["id", "id(m)"], ["flags", "m.num_flags"]],
                 "condition": (
                     "m.orientable && m.polytopality == 'Polytopal' "
                     "&& m.schlafli_symbol == (4, 8, 8)"
@@ -237,11 +237,11 @@ database = Database(
             "the skeleta of the smallest polytopal maniplexes, via the two-hop chain",
             {
                 "domains": [["m", "Maniplex"]],
-                "output": {
-                    "id": "id(m)",
-                    "flags": "m.num_flags",
-                    "skeleton6": "m.skeleton.graph.sparse6",
-                },
+                "output": [
+                    ["id", "id(m)"],
+                    ["flags", "m.num_flags"],
+                    ["skeleton6", "m.skeleton.graph.sparse6"],
+                ],
                 "condition": "m.polytopality == 'Polytopal'",
                 "order": [["flags", "asc"]],
                 "limit": 5,
@@ -251,7 +251,7 @@ database = Database(
             "self-dual maniplexes: the skeleton and coskeleton are the same graph",
             {
                 "domains": [["m", "Maniplex"]],
-                "output": {"id": "id(m)", "graph_id": "id(m.skeleton.graph)"},
+                "output": [["id", "id(m)"], ["graph_id", "id(m.skeleton.graph)"]],
                 "condition": "id(m.skeleton.graph) == id(m.coskeleton.graph)",
                 "limit": 5,
             },
@@ -260,7 +260,7 @@ database = Database(
             "maniplexes with a nontrivial color group, most flags first",
             {
                 "domains": [["m", "Maniplex"]],
-                "output": {"id": "id(m)", "flags": "m.num_flags"},
+                "output": [["id", "id(m)"], ["flags", "m.num_flags"]],
                 "condition": "m.color_group != []",
                 "order": [["flags", "desc"]],
                 "limit": 5,
@@ -270,7 +270,7 @@ database = Database(
             "graphs referenced in the House of Graphs, with their vertex counts",
             {
                 "domains": [["r", "GraphExternalReference"]],
-                "output": {"hog": "r.external_id", "vertices": "r.graph.num_vertices"},
+                "output": [["hog", "r.external_id"], ["vertices", "r.graph.num_vertices"]],
                 "condition": "r.source == 'HoG'",
                 "limit": 5,
             },

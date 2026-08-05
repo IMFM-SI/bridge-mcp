@@ -10,9 +10,10 @@ import pytest
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
@@ -22,7 +23,7 @@ def _rendered(request: dict[str, Any]) -> str:
 
 
 def test_composite_key_id() -> None:
-    rendered = _rendered({"domains": [["t", "Trait"]], "output": {"key": "id(t)"}})
+    rendered = _rendered({"domains": [["t", "Trait"]], "output": [["key", "id(t)"]]})
     assert rendered == (
         'SELECT json_array("t"."space", "t"."property") AS "key"'
         ' FROM "pibase_trait" AS "t" WHERE 1'
@@ -33,7 +34,7 @@ def test_composite_key_object() -> None:
     rendered = _rendered(
         {
             "domains": [["s", "Space"]],
-            "output": {"v": "Trait['S000026', 'P000016'].value"},
+            "output": [["v", "Trait['S000026', 'P000016'].value"]],
         }
     )
     assert (
@@ -46,7 +47,7 @@ def test_id_tuple_comparison_canonicalized() -> None:
     rendered = _rendered(
         {
             "domains": [["t", "Trait"]],
-            "output": {"v": "t.value"},
+            "output": [["v", "t.value"]],
             "condition": "id(t) == ('S000149', 'P000053')",
         }
     )
@@ -60,7 +61,7 @@ def test_foreign_keys_join() -> None:
     rendered = _rendered(
         {
             "domains": [["t", "Trait"]],
-            "output": {"space": "t.space.name", "property": "t.property.name"},
+            "output": [["space", "t.space.name"], ["property", "t.property.name"]],
             "condition": "t.value",
         }
     )
@@ -76,7 +77,7 @@ def test_nullable_theorem_link() -> None:
     rendered = _rendered(
         {
             "domains": [["t", "Trait"]],
-            "output": {"statement": "t.theorem.statement"},
+            "output": [["statement", "t.theorem.statement"]],
             "condition": "defined id(t.theorem)",
         }
     )
@@ -112,12 +113,12 @@ def connection() -> Iterator[sqlite3.Connection]:
 def test_discrete_two_point_is_compact_and_metrizable(
     connection: sqlite3.Connection,
 ) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["t", "Trait"]],
-            "output": {"prop": "t.property.name", "value": "t.value"},
+            "output": [["prop", "t.property.name"], ["value", "t.value"]],
             "condition": (
                 "id(t.space) == 'S000001'"
                 " && (id(t.property) == 'P000016' || id(t.property) == 'P000053')"
@@ -132,17 +133,17 @@ def test_discrete_two_point_is_compact_and_metrizable(
 
 
 def test_provenance_of_a_trait(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["t", "Trait"]],
-            "output": {
-                "value": "t.value",
-                "asserted": "t.asserted",
-                "theorem": "t.theorem.statement",
-                "premises": "t.premises",
-            },
+            "output": [
+                ["value", "t.value"],
+                ["asserted", "t.asserted"],
+                ["theorem", "t.theorem.statement"],
+                ["premises", "t.premises"],
+            ],
             "condition": "id(t) == ('S000149', 'P000053')",
         },
     )
@@ -153,12 +154,12 @@ def test_provenance_of_a_trait(connection: sqlite3.Connection) -> None:
 
 
 def test_compact_nonmetrizable_spaces_exist(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["t1", "Trait"], ["t2", "Trait"]],
-            "output": {"space": "t1.space.name"},
+            "output": [["space", "t1.space.name"]],
             "condition": (
                 "id(t1.property) == 'P000016' && t1.value"
                 " && id(t2.property) == 'P000053' && !t2.value"

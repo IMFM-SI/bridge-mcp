@@ -10,9 +10,10 @@ import pytest
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
@@ -25,7 +26,7 @@ def test_composite_key_object() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Group"]],
-            "output": {"name": "Group[24, 12].structure_description"},
+            "output": [["name", "Group[24, 12].structure_description"]],
         }
     )
     assert (
@@ -37,7 +38,7 @@ def test_keyword_columns_are_quoted() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Group"]],
-            "output": {"n": "g.order"},
+            "output": [["n", "g.order"]],
             "order": [["g.order", "desc"]],
         }
     )
@@ -72,17 +73,17 @@ def connection() -> Iterator[sqlite3.Connection]:
 
 
 def test_alternating_group_a5(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {
-                "name": "g.structure_description",
-                "simple": "g.is_simple",
-                "solvable": "g.is_solvable",
-                "classes": "g.num_conjugacy_classes",
-            },
+            "output": [
+                ["name", "g.structure_description"],
+                ["simple", "g.is_simple"],
+                ["solvable", "g.is_solvable"],
+                ["classes", "g.num_conjugacy_classes"],
+            ],
             "condition": "id(g) == (60, 5)",
         },
     )
@@ -90,12 +91,12 @@ def test_alternating_group_a5(connection: sqlite3.Connection) -> None:
 
 
 def test_smallest_nonsolvable_group_is_a5(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {"id": "id(g)", "name": "g.structure_description"},
+            "output": [["id", "id(g)"], ["name", "g.structure_description"]],
             "condition": "!g.is_solvable",
             "order": [["g.order", "asc"]],
             "limit": 1,
@@ -105,12 +106,12 @@ def test_smallest_nonsolvable_group_is_a5(connection: sqlite3.Connection) -> Non
 
 
 def test_nilpotency_class_is_undefined_for_s3(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {"nc": "g.nilpotency_class", "dl": "g.derived_length"},
+            "output": [["nc", "g.nilpotency_class"], ["dl", "g.derived_length"]],
             "condition": "id(g) == (6, 1) && undefined g.nilpotency_class",
         },
     )
@@ -127,12 +128,12 @@ def test_census_counts(connection: sqlite3.Connection) -> None:
 
 
 def test_abelian_invariants(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {"name": "g.structure_description"},
+            "output": [["name", "g.structure_description"]],
             "condition": "g.order == 4 && g.abelianization == [2, 2]",
         },
     )

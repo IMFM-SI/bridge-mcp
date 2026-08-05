@@ -50,14 +50,14 @@ def _rendered(request: dict[str, object]) -> str:
 def test_fields_and_condition() -> None:
     assert (
         _rendered(
-            {"domains": [["g", "Graph"]], "output": {"n": "g.n"}, "condition": "g.n > 3"}
+            {"domains": [["g", "Graph"]], "output": [["n", "g.n"]], "condition": "g.n > 3"}
         )
         == 'SELECT "g"."n" AS "n" FROM "graph" AS "g" WHERE ("g"."n" > 3)'
     )
 
 
 def test_id_of_single_column_key() -> None:
-    assert _rendered({"domains": [["g", "Graph"]], "output": {"gid": "id(g)"}}) == (
+    assert _rendered({"domains": [["g", "Graph"]], "output": [["gid", "id(g)"]]}) == (
         'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
     )
 
@@ -66,7 +66,7 @@ def test_domain_field_hoists_one_join() -> None:
     rendered = _rendered(
         {
             "domains": [["m", "Maniplex"]],
-            "output": {"s": "m.skeleton.graph6"},
+            "output": [["s", "m.skeleton.graph6"]],
             "condition": "m.skeleton.n > 3",
         }
     )
@@ -81,7 +81,7 @@ def test_obj_hoists_a_join() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"n": "Graph['abc'].n"},
+            "output": [["n", "Graph['abc'].n"]],
             "condition": "g.n == Graph['abc'].n",
         }
     )
@@ -96,7 +96,7 @@ def test_defined_on_domain_field() -> None:
     rendered = _rendered(
         {
             "domains": [["m", "Maniplex"]],
-            "output": {"mid": "m.mid"},
+            "output": [["mid", "m.mid"]],
             "condition": "defined id(m.skeleton)",
         }
     )
@@ -107,7 +107,7 @@ def test_order_by_alias_renders_bare() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"m": "g.n * g.n"},
+            "output": [["m", "g.n * g.n"]],
             "order": [["m", "desc"]],
             "limit": 3,
         }
@@ -121,7 +121,7 @@ def test_fresh_alias_avoids_variables() -> None:
     rendered = _rendered(
         {
             "domains": [["graph", "Graph"]],
-            "output": {"n": "Graph['abc'].n"},
+            "output": [["n", "Graph['abc'].n"]],
         }
     )
     assert 'LEFT JOIN "graph" AS "Graph2" ON "Graph2"."graph6" = \'abc\'' in rendered
@@ -131,7 +131,7 @@ def test_tuples_projections_and_conditional() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"pair": "(g.n, g.planar)", "first": "(g.n, g.planar).0"},
+            "output": [["pair", "(g.n, g.planar)"], ["first", "(g.n, g.planar).0"]],
             "condition": "if g.planar then g.n > 0 else [1, 2] == [g.n, g.n]",
         }
     )
@@ -145,4 +145,4 @@ def test_tuples_projections_and_conditional() -> None:
 
 def test_condition_does_not_see_aliases() -> None:
     with pytest.raises(MathQLError):
-        _typed({"domains": [["g", "Graph"]], "output": {"m": "g.n"}, "condition": "m > 0"})
+        _typed({"domains": [["g", "Graph"]], "output": [["m", "g.n"]], "condition": "m > 0"})

@@ -89,7 +89,7 @@ database = Database(
             "the trees on 5 vertices",
             {
                 "domains": [["g", "Graph"]],
-                "output": {"graph6": "g.graph6", "degree_sequence": "g.degree_sequence"},
+                "output": [["graph6", "g.graph6"], ["degree_sequence", "g.degree_sequence"]],
                 "condition": "g.num_vertices == 5 && g.is_tree",
             },
         ),
@@ -97,7 +97,7 @@ database = Database(
             "the three graphs on 5 vertices with the most edges",
             {
                 "domains": [["g", "Graph"]],
-                "output": {"graph6": "g.graph6", "num_edges": "g.num_edges"},
+                "output": [["graph6", "g.graph6"], ["num_edges", "g.num_edges"]],
                 "condition": "g.num_vertices == 5",
                 "order": [["g.num_edges", "desc"]],
                 "limit": 3,
@@ -107,7 +107,7 @@ database = Database(
             "connected non-planar graphs on at least 6 vertices, fewest vertices first",
             {
                 "domains": [["g", "Graph"]],
-                "output": {"graph6": "g.graph6", "num_vertices": "g.num_vertices"},
+                "output": [["graph6", "g.graph6"], ["num_vertices", "g.num_vertices"]],
                 "condition": "g.is_connected && !g.is_planar && g.num_vertices >= 6",
                 "order": [["g.num_vertices", "asc"]],
                 "limit": 5,
@@ -117,7 +117,7 @@ database = Database(
             "pairs of graphs with equally many vertices where the first has fewer edges",
             {
                 "domains": [["g", "Graph"], ["h", "Graph"]],
-                "output": {"first": "g.graph6", "second": "h.graph6"},
+                "output": [["first", "g.graph6"], ["second", "h.graph6"]],
                 "condition": "g.num_vertices == h.num_vertices && g.num_edges < h.num_edges",
                 "limit": 5,
             },
@@ -126,7 +126,7 @@ database = Database(
             "forests (girth undefined) on at most 4 vertices",
             {
                 "domains": [["g", "Graph"]],
-                "output": {"graph6": "g.graph6"},
+                "output": [["graph6", "g.graph6"]],
                 "condition": "undefined g.girth && g.num_vertices <= 4",
                 "limit": 5,
             },
@@ -135,7 +135,7 @@ database = Database(
             "bipartite or planar graphs whose diameter is defined and exceeds 2, widest first",
             {
                 "domains": [["g", "Graph"]],
-                "output": {"graph6": "g.graph6", "diameter": "g.diameter"},
+                "output": [["graph6", "g.graph6"], ["diameter", "g.diameter"]],
                 "condition": (
                     "(g.is_bipartite || g.is_planar) && defined g.diameter && g.diameter > 2"
                 ),
@@ -147,11 +147,11 @@ database = Database(
             "the most irregular graphs, by the spread between max and min degree",
             {
                 "domains": [["g", "Graph"]],
-                "output": {
-                    "graph6": "g.graph6",
-                    "max_degree": "g.max_degree",
-                    "min_degree": "g.min_degree",
-                },
+                "output": [
+                    ["graph6", "g.graph6"],
+                    ["max_degree", "g.max_degree"],
+                    ["min_degree", "g.min_degree"],
+                ],
                 "condition": "g.max_degree != g.min_degree",
                 "order": [["g.max_degree - g.min_degree", "desc"]],
                 "limit": 3,
@@ -161,7 +161,7 @@ database = Database(
             "compact spaces that are not metrizable",
             {
                 "domains": [["t1", "Trait"], ["t2", "Trait"]],
-                "output": {"space": "t1.space.name"},
+                "output": [["space", "t1.space.name"]],
                 "condition": (
                     "id(t1.property) == 'P000016' && t1.value"
                     " && id(t2.property) == 'P000053' && !t2.value"
@@ -174,12 +174,12 @@ database = Database(
             "why the two-sided long line is not metrizable: the trait with provenance",
             {
                 "domains": [["t", "Trait"]],
-                "output": {
-                    "value": "t.value",
-                    "asserted": "t.asserted",
-                    "theorem": "t.theorem.statement",
-                    "premises": "t.premises",
-                },
+                "output": [
+                    ["value", "t.value"],
+                    ["asserted", "t.asserted"],
+                    ["theorem", "t.theorem.statement"],
+                    ["premises", "t.premises"],
+                ],
                 "condition": "id(t) == ('S000149', 'P000053')",
             },
         ),
@@ -187,7 +187,7 @@ database = Database(
             "the asserted (not derived) traits of the Cantor space",
             {
                 "domains": [["t", "Trait"]],
-                "output": {"property": "t.property.name", "value": "t.value"},
+                "output": [["property", "t.property.name"], ["value", "t.value"]],
                 "condition": "id(t.space) == 'S000026' && t.asserted",
             },
         ),
@@ -195,7 +195,7 @@ database = Database(
             "the nonabelian groups of order 16",
             {
                 "domains": [["g", "Group"]],
-                "output": {"group": "g.structure_description"},
+                "output": [["group", "g.structure_description"]],
                 "condition": "g.order == 16 && !g.is_abelian",
             },
         ),
@@ -203,7 +203,7 @@ database = Database(
             "the smallest non-solvable groups",
             {
                 "domains": [["g", "Group"]],
-                "output": {"id": "id(g)", "name": "g.structure_description"},
+                "output": [["id", "id(g)"], ["name", "g.structure_description"]],
                 "condition": "!g.is_solvable",
                 "order": [["g.order", "asc"]],
                 "limit": 3,
@@ -213,7 +213,7 @@ database = Database(
             "which sources must be trusted for trait values",
             {
                 "domains": [["p", "Provenance"]],
-                "output": {"source": "p.source.tool", "note": "p.note"},
+                "output": [["source", "p.source.tool"], ["note", "p.note"]],
                 "condition": "p.domain == 'Trait' && p.field == 'value'",
             },
         ),

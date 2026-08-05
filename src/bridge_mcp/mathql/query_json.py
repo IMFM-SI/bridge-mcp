@@ -1,7 +1,7 @@
 """Decode a query from its JSON form into the input AST.
 
 The JSON shape used over the MCP interface:
-`{"domains": [[v, d], ...], "output": {name: "e", ...}, "condition": "...",
+`{"domains": [[v, d], ...], "output": [[name, "e"], ...], "condition": "...",
   "order": [["e", "asc"], ...], "limit": n}`.
 """
 
@@ -31,15 +31,21 @@ def _binding(pair: Any) -> input_ast.Binding:
             raise MathQLError("a domain binding must be a [variable, domain] pair")
 
 
-def _output_column(name: Any, value: Any) -> tuple[str, input_ast.Expr]:
-    return parse_identifier(str(name)), _expression(value)
+def _entry(pair: Any) -> tuple[str, input_ast.Expr]:
+    match pair:
+        case [name, expression]:
+            return parse_identifier(str(name)), _expression(expression)
+        case _:
+            raise MathQLError("an entry must be a [name, expression] pair")
 
 
-def _output(data: Any) -> tuple[tuple[str, input_ast.Expr], ...]:
-    if isinstance(data, Mapping):
-        return tuple(_output_column(name, value) for name, value in data.items())
-    else:
-        raise MathQLError("'output' must map column names to expression strings")
+def _entries(clause: str, data: Any) -> tuple[tuple[str, input_ast.Expr], ...]:
+    """Decode a clause given as a list of `[name, expression]` pairs, keeping its order."""
+    match data:
+        case [*pairs]:
+            return tuple(_entry(pair) for pair in pairs)
+        case _:
+            raise MathQLError(f"'{clause}' must be a list of [name, expression] pairs")
 
 
 def _direction(text: Any) -> Direction:
@@ -77,7 +83,7 @@ def from_json(data: Mapping[str, Any]) -> input_ast.Query:
     if "domains" not in data or "output" not in data:
         raise MathQLError("a query must have 'domains' and 'output'")
     domains = tuple(_binding(pair) for pair in data["domains"])
-    output = _output(data["output"])
+    output = _entries("output", data["output"])
     condition = _expression(data["condition"]) if data.get("condition") is not None else None
     order = (
         tuple(_order_entry(entry) for entry in data["order"])

@@ -30,7 +30,8 @@ from bridge_mcp.graph.tools import (
     spanning_tree,
 )
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path
+from tests.rows import rows_by_name
 
 TRIANGLE = "Bw"  # C3
 C7 = "FCp`_"  # the 7-cycle
@@ -79,10 +80,12 @@ def test_invariants_match_database() -> None:
     if not db.exists():
         pytest.skip(f"{db} not present")
     connection = sqlite3.connect(db)
-    output = {
-        label: f"g.{label}" for label in database.domains["Graph"].columns if label != "graph6"
-    }
-    rows = run_query(
+    output = [
+        [label, f"g.{label}"]
+        for label in database.domains["Graph"].columns
+        if label != "graph6"
+    ]
+    rows = rows_by_name(
         connection,
         database,
         {
@@ -92,7 +95,7 @@ def test_invariants_match_database() -> None:
         },
     )
     connection.close()
-    assert invariants(TRIANGLE) == rows[0]
+    assert invariants(TRIANGLE) == dict(rows[0])
 
 
 # --- witnesses ---

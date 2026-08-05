@@ -7,7 +7,7 @@ import json
 import sqlite3
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
@@ -29,10 +29,12 @@ def _available() -> dict[str, tuple[Database, Path]]:
 DATABASES = _available()
 
 _SUMMARY = """## Writing queries
-`query` takes: domains (e.g. [["g", "Graph"]]); output, a mapping from each result
-column name to the expression it returns (e.g. {"g6": "id(g)", "edges": "g.num_edges"});
-and optional condition, order ([expression, "asc"|"desc"] pairs, which may refer to the
-output column names), limit, and database. Expressions use fields (g.num_vertices),
+`query` takes: domains (e.g. [["g", "Graph"]]); output, a list of [column name,
+expression] pairs in the order the columns are to appear (e.g. [["g6", "id(g)"],
+["edges", "g.num_edges"]]); and optional condition, order ([expression, "asc"|"desc"]
+pairs, which may refer to the output column names), limit, and database. Each returned
+row is a list of [column name, value] pairs in that same order. Expressions use fields
+(g.num_vertices),
 id(x) for an object's primary key, literals, arithmetic (+ - *), comparisons
 (== != < <= > >=), booleans (&& || !), and defined/undefined for absence; a comparison
 needs both sides the same type. String literals are single-quoted ('text', a literal
@@ -93,24 +95,28 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def query(
-        domains: list[list[str]],
-        output: dict[str, str],
+        domains: list[tuple[str, str]],
+        output: list[tuple[str, str]],
         condition: str | None = None,
-        order: list[list[str]] | None = None,
+        order: list[tuple[str, Literal["asc", "desc"]]] | None = None,
         limit: int | None = None,
         database: str | None = None,
-    ) -> list[dict[str, object]]:
+    ) -> list[list[tuple[str, Any]]]:
         """Run a MathQL query and return the matching rows.
 
+        Each row is a list of [column name, value] pairs, the output columns in
+        their given order.
+
         domains: variable bindings, e.g. [["g", "Graph"]].
-        output: a mapping from result column name to the expression it returns,
-            e.g. {"g6": "id(g)", "edges": "g.num_edges"}.
+        output: [column name, expression] pairs, in the order the columns are to
+            appear, e.g. [["g6", "id(g)"], ["edges", "g.num_edges"]]. Each
+            expression is over the bound variables (see the grammar tool).
         condition: a boolean expression over the bound variables (optional).
         order: [expression, "asc"|"desc"] pairs; the expressions may refer to the
             output column names (optional).
         limit: maximum number of rows (optional).
-        database: which database to query (optional; call `describe` with no
-            arguments for the list, the first entry being the default).
+        database: which database to query (optional; `describe` with an empty
+            argument list returns the list, the first entry being the default).
         """
         selected, path = resolve(database)
         request: dict[str, Any] = {"domains": domains, "output": output}

@@ -8,7 +8,8 @@ import networkx
 import pytest
 
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path
+from tests.rows import rows_by_name
 
 
 @pytest.fixture
@@ -35,12 +36,12 @@ def test_cayley_graph_of_c6_is_the_hexagon(connection: sqlite3.Connection) -> No
         text=True,
         check=True,
     ).stdout.strip()
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {"graph": "id(g.cayley_graph)"},
+            "output": [["graph", "id(g.cayley_graph)"]],
             "condition": "id(g) == (6, 2)",
         },
     )
@@ -48,17 +49,17 @@ def test_cayley_graph_of_c6_is_the_hexagon(connection: sqlite3.Connection) -> No
 
 
 def test_cayley_graph_of_s4(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {
-                "vertices": "g.cayley_graph.num_vertices",
-                "connected": "g.cayley_graph.is_connected",
-                "regular": "g.cayley_graph.is_regular",
-                "generators": "g.cayley_generators",
-            },
+            "output": [
+                ["vertices", "g.cayley_graph.num_vertices"],
+                ["connected", "g.cayley_graph.is_connected"],
+                ["regular", "g.cayley_graph.is_regular"],
+                ["generators", "g.cayley_generators"],
+            ],
             "condition": "id(g) == (24, 12)",
         },
     )
@@ -81,15 +82,15 @@ def test_cayley_graphs_cover_orders_up_to_100(connection: sqlite3.Connection) ->
 
 
 def test_cayley_rows_have_cheap_invariants_only(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Graph"]],
-            "output": {
-                "diameter_defined": "defined g.diameter",
-                "chromatic_defined": "defined g.chromatic_number",
-            },
+            "output": [
+                ["diameter_defined", "defined g.diameter"],
+                ["chromatic_defined", "defined g.chromatic_number"],
+            ],
             "condition": ("id(g.source) == 'cayley' && g.is_connected && g.num_vertices > 8"),
             "limit": 5,
         },
@@ -100,12 +101,12 @@ def test_cayley_rows_have_cheap_invariants_only(connection: sqlite3.Connection) 
 
 
 def test_small_cayley_graphs_reuse_geng_rows(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["g", "Group"]],
-            "output": {"source": "id(g.cayley_graph.source)"},
+            "output": [["source", "id(g.cayley_graph.source)"]],
             "condition": "g.order <= 8",
         },
     )

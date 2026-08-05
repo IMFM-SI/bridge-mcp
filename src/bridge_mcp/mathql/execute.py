@@ -60,24 +60,24 @@ def _decode_cell(ty: Ty, cell: Any) -> object:
         assert_never(ty)
 
 
-def _decode_row(q: query.Query, row: Sequence[Any]) -> dict[str, object]:
-    """One row's output cells, keyed by their column names, in output order."""
-    return {
-        column.name: _decode_cell(column.ty, cell)
+def _decode_row(q: query.Query, row: Sequence[Any]) -> list[tuple[str, object]]:
+    """One row's output cells, each paired with its column name, in output order."""
+    return [
+        (column.name, _decode_cell(column.ty, cell))
         for column, cell in zip(q.output, row, strict=True)
-    }
+    ]
 
 
 def run(
     connection: sqlite3.Connection, database: Database, q: query.Query
-) -> list[dict[str, object]]:
-    """Run a type-checked query, returning one JSON object per matching row."""
+) -> list[list[tuple[str, object]]]:
+    """Run a type-checked query, returning each row as its list of name/value pairs."""
     rendered = sql.render_query(compile_query(database, q))
     return [_decode_row(q, row) for row in connection.execute(rendered).fetchall()]
 
 
 def run_query(
     connection: sqlite3.Connection, database: Database, request: Mapping[str, Any]
-) -> list[dict[str, object]]:
+) -> list[list[tuple[str, object]]]:
     """Parse, type-check, compile, and run a query from its JSON form."""
     return run(connection, database, check_query(database.context(), from_json(request)))

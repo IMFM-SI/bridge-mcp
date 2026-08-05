@@ -19,7 +19,7 @@ def test_render_simple() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"graph6": "g.graph6"},
+            "output": [["graph6", "g.graph6"]],
             "condition": "g.num_vertices == 5",
         }
     )
@@ -32,7 +32,7 @@ def test_render_order_and_limit() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"graph6": "g.graph6"},
+            "output": [["graph6", "g.graph6"]],
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
             "limit": 3,
@@ -47,7 +47,7 @@ def test_render_list_literal() -> None:
     rendered = _rendered(
         {
             "domains": [["g", "Graph"]],
-            "output": {"graph6": "g.graph6"},
+            "output": [["graph6", "g.graph6"]],
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
     )
@@ -55,7 +55,7 @@ def test_render_list_literal() -> None:
 
 
 def test_id_is_graph6() -> None:
-    rendered = _rendered({"domains": [["g", "Graph"]], "output": {"gid": "id(g)"}})
+    rendered = _rendered({"domains": [["g", "Graph"]], "output": [["gid", "id(g)"]]})
     assert rendered == 'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
 
 

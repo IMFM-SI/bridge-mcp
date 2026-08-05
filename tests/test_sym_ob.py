@@ -10,9 +10,9 @@ import pytest
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.sym_ob_small import database, database_path
-from bridge_mcp.mathql.execute import run_query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
@@ -25,7 +25,7 @@ def test_two_hop_chain_shares_joins() -> None:
     rendered = _rendered(
         {
             "domains": [["m", "Maniplex"]],
-            "output": {"s6": "m.skeleton.graph.sparse6"},
+            "output": [["s6", "m.skeleton.graph.sparse6"]],
             "condition": "m.skeleton.graph.num_vertices > 4",
         }
     )
@@ -42,7 +42,7 @@ def test_two_hop_chain_shares_joins() -> None:
 
 
 def test_keyword_column_quoted() -> None:
-    rendered = _rendered({"domains": [["g", "Graph"]], "output": {"n": "g.num_vertices"}})
+    rendered = _rendered({"domains": [["g", "Graph"]], "output": [["n", "g.num_vertices"]]})
     assert '"g"."order" AS "n"' in rendered
 
 
@@ -50,7 +50,7 @@ def test_tuple_comparison_canonicalized() -> None:
     rendered = _rendered(
         {
             "domains": [["m", "Maniplex"]],
-            "output": {"id": "id(m)"},
+            "output": [["id", "id(m)"]],
             "condition": "m.schlafli_symbol == (4, 8, 8)",
         }
     )
@@ -83,16 +83,16 @@ def connection() -> Iterator[sqlite3.Connection]:
 
 
 def test_smallest_polytopal_skeleton(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["m", "Maniplex"]],
-            "output": {
-                "id": "id(m)",
-                "flags": "m.num_flags",
-                "s6": "m.skeleton.graph.sparse6",
-            },
+            "output": [
+                ["id", "id(m)"],
+                ["flags", "m.num_flags"],
+                ["s6", "m.skeleton.graph.sparse6"],
+            ],
             "condition": "m.polytopality == 'Polytopal'",
             "order": [["flags", "asc"]],
             "limit": 1,
@@ -102,12 +102,12 @@ def test_smallest_polytopal_skeleton(connection: sqlite3.Connection) -> None:
 
 
 def test_schlafli_tuple_roundtrip(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["m", "Maniplex"]],
-            "output": {"symbol": "m.schlafli_symbol"},
+            "output": [["symbol", "m.schlafli_symbol"]],
             "condition": "m.orientable && m.schlafli_symbol == (4, 8, 8)",
             "limit": 1,
         },
@@ -116,12 +116,12 @@ def test_schlafli_tuple_roundtrip(connection: sqlite3.Connection) -> None:
 
 
 def test_house_of_graphs_references(connection: sqlite3.Connection) -> None:
-    rows = run_query(
+    rows = rows_by_name(
         connection,
         database,
         {
             "domains": [["r", "GraphExternalReference"]],
-            "output": {"source": "r.source", "vertices": "r.graph.num_vertices"},
+            "output": [["source", "r.source"], ["vertices", "r.graph.num_vertices"]],
             "condition": "r.source == 'HoG'",
             "limit": 2,
         },

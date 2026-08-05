@@ -9,7 +9,7 @@ from bridge_mcp.mathql.query_json import from_json
 
 
 def test_minimal() -> None:
-    q = from_json({"domains": [["g", "Graph"]], "output": {"graph6": "g.graph6"}})
+    q = from_json({"domains": [["g", "Graph"]], "output": [["graph6", "g.graph6"]]})
     assert q.domains == (ast.Binding("g", "Graph"),)
     assert q.output == (("graph6", ast.Field(ast.Ident("g"), "graph6")),)
     assert q.condition is None
@@ -21,7 +21,7 @@ def test_full() -> None:
     q = from_json(
         {
             "domains": [["g", "Graph"]],
-            "output": {"g6": "id(g)", "edges": "g.num_edges"},
+            "output": [["g6", "id(g)"], ["edges", "g.num_edges"]],
             "condition": "g.num_vertices == 5",
             "order": [["g.num_edges", "desc"]],
             "limit": 3,
@@ -38,20 +38,49 @@ def test_full() -> None:
     assert q.limit == 3
 
 
+def test_output_keeps_its_order() -> None:
+    q = from_json(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [[name, "g.num_edges"] for name in ("zeta", "alpha", "mu", "beta")],
+        }
+    )
+    assert [name for name, _ in q.output] == ["zeta", "alpha", "mu", "beta"]
+
+
+def test_output_admits_a_repeated_column_name() -> None:
+    q = from_json(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.num_vertices"], ["n", "g.num_edges"]],
+        }
+    )
+    assert q.output == (
+        ("n", ast.Field(ast.Ident("g"), "num_vertices")),
+        ("n", ast.Field(ast.Ident("g"), "num_edges")),
+    )
+
+
 def test_errors() -> None:
     with pytest.raises(MathQLError):
-        from_json({"output": {"n": "g.n"}})  # missing domains
+        from_json({"output": [["n", "g.n"]]})  # missing domains
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g"]], "output": {"n": "g.n"}})  # malformed binding
+        from_json({"domains": [["g"]], "output": [["n", "g.n"]]})  # malformed binding
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": ["g.n"]})  # output must be a mapping
+        from_json({"domains": [["g", "G"]], "output": {"n": "g.n"}})  # output must be a list
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": {"g.n": "g.n"}})  # bad column name
+        from_json({"domains": [["g", "G"]], "output": ["g.n"]})  # entry must be a pair
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": {"if": "g.n"}})  # keyword column name
+        from_json({"domains": [["g", "G"]], "output": [["n"]]})  # entry must be a pair
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": {"n": 3}})  # non-string expression
+        from_json({"domains": [["g", "G"]], "output": [["g.n", "g.n"]]})  # bad column name
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": {"n": "g.n"}, "order": [["g.n", "up"]]})
+        from_json({"domains": [["g", "G"]], "output": [["if", "g.n"]]})  # keyword column name
     with pytest.raises(MathQLError):
-        from_json({"domains": [["g", "G"]], "output": {"n": "g.n"}, "limit": -1})
+        from_json({"domains": [["g", "G"]], "output": [["n", 3]]})  # non-string expression
+    with pytest.raises(MathQLError):
+        from_json(
+            {"domains": [["g", "G"]], "output": [["n", "g.n"]], "order": [["g.n", "up"]]}
+        )
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "G"]], "output": [["n", "g.n"]], "limit": -1})
