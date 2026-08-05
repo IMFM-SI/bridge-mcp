@@ -38,7 +38,9 @@ computed after the rows come back, each expression over the output columns and a
 earlier entry. Each returned row is a list of [column name, value] pairs: the output
 columns in their order, then the postprocess columns in theirs. Expressions use fields
 (g.num_vertices), id(x) for an object's primary key, literals, arithmetic (+ - *),
-comparisons (== != < <= > >=), booleans (&& || !), and defined/undefined for absence;
+comparisons (== != < <= > >=), booleans (&& || !), defined/undefined for absence, list
+and tuple literals ([1, 2] and (1, 'a'), a tuple projected with .0), and calls to the
+functions a database declares (f(x, y));
 a comparison needs both sides the same type. String literals are single-quoted ('text',
 a literal quote doubled as ''). ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work.
 Call the `grammar` tool for the full grammar."""

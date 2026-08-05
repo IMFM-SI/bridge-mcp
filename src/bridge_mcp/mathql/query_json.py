@@ -23,10 +23,17 @@ def _expression(value: Any) -> input_ast.Expr:
         raise MathQLError("an expression must be a string")
 
 
+def _identifier(value: Any) -> str:
+    if isinstance(value, str):
+        return parse_identifier(value)
+    else:
+        raise MathQLError("an identifier must be a string")
+
+
 def _binding(pair: Any) -> input_ast.Binding:
     match pair:
         case [var, domain]:
-            return input_ast.Binding(parse_identifier(str(var)), parse_identifier(str(domain)))
+            return input_ast.Binding(_identifier(var), _identifier(domain))
         case _:
             raise MathQLError("a domain binding must be a [variable, domain] pair")
 
@@ -34,7 +41,7 @@ def _binding(pair: Any) -> input_ast.Binding:
 def _entry(pair: Any) -> tuple[str, input_ast.Expr]:
     match pair:
         case [name, expression]:
-            return parse_identifier(str(name)), _expression(expression)
+            return _identifier(name), _expression(expression)
         case _:
             raise MathQLError("an entry must be a [name, expression] pair")
 

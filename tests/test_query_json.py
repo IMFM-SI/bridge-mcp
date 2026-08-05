@@ -117,3 +117,10 @@ def test_postprocess_errors() -> None:
         from_json({**base, "postprocess": [["k"]]})
     with pytest.raises(MathQLError):
         from_json({**base, "postprocess": [["if", "3"]]})
+
+
+def test_a_name_must_be_a_string() -> None:
+    with pytest.raises(MathQLError):
+        from_json({"domains": [["g", "Graph"]], "output": [[True, "g.num_vertices"]]})
+    with pytest.raises(MathQLError):
+        from_json({"domains": [[True, "Graph"]], "output": [["n", "g.num_vertices"]]})
