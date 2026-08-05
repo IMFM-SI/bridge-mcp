@@ -104,8 +104,8 @@ def _eval_unary_op(op: UnaryOp, value: object) -> object:
 
 
 def _eval_binary_op(op: BinaryOp, left: object, right: object) -> object:
-    """Both operands are already evaluated, so `&&` and `||` are strict: an operand that
-    is no boolean makes the whole expression fail, as it does in the reference."""
+    """`&&` and `||` are strict: each coerces both operands, so an operand that is no
+    boolean makes the whole expression fail."""
     match op:
         case BinaryOp.AND:
             return _as_bool(left) & _as_bool(right)
@@ -170,8 +170,8 @@ class PostEnvironment:
 
 
 def _apply(env: PostEnvironment, name: str, args: tuple[object, ...]) -> object:
-    """Apply a postprocess function. Whatever the implementation raises is reported as a
-    `MathQLError`, so the rest of the evaluator has one failure to consider."""
+    """Apply a postprocess function, reporting whatever the implementation raises as a
+    `MathQLError`."""
     match env.functions.get(name):
         case None:
             raise MathQLError(f"unknown function {name}")
