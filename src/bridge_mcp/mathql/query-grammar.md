@@ -21,9 +21,9 @@ A query is a JSON object:
 - `domains` (required) binds one or more variables, each ranging over a named
   domain; several bindings form a join.
 - `output` (required) is an ordered list of `[name, expression]` pairs. Each name is
-  a plain identifier and names a result column whose value is the value of the
-  expression. The list order is the column order of every row. Each output
-  expression may refer to the variables bound by `domains`.
+  a plain identifier, distinct from the other names, and names a result column whose
+  value is the value of the expression. The list order is the column order of every
+  row. Each output expression may refer to the variables bound by `domains`.
 - `condition` (optional, default `true`) restricts the result to the objects, or
   tuples of objects, that satisfy it; it must have type `bool`.
 - `order` (optional) sorts the result by one or more scalar expressions, each

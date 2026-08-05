@@ -165,3 +165,9 @@ def test_the_two_function_tables_are_separate() -> None:
 
 def test_postprocess_sees_no_domain_variables() -> None:
     assert not _post_elaborates([("n", "g.n")], [("k", "g.n")])
+
+
+def test_output_column_names_are_distinct() -> None:
+    assert _elaborates([("a", "g.n"), ("b", "h.n")], "true")
+    assert _elaborates([("g", "g.n"), ("h", "h.n")], "true")  # a variable's name is free
+    assert not _elaborates([("n", "g.n"), ("n", "h.n")], "true")

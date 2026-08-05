@@ -48,7 +48,8 @@ def test_output_keeps_its_order() -> None:
     assert [name for name, _ in q.output] == ["zeta", "alpha", "mu", "beta"]
 
 
-def test_output_admits_a_repeated_column_name() -> None:
+def test_decoding_admits_a_repeated_column_name() -> None:
+    """The type-checker is the layer that rejects one."""
     q = from_json(
         {
             "domains": [["g", "Graph"]],

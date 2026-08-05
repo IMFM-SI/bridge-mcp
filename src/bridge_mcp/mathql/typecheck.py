@@ -187,9 +187,22 @@ def _check_domains(
     return extended, tuple(query.Binding(b.var, b.domain) for b in domains)
 
 
-def _output_column(ctx: Context, name: str, e: input_ast.Expr) -> query.OutputColumn:
-    ty, typed = infer(ctx, e)
-    return query.OutputColumn(name, ty, typed)
+def _check_output(
+    ctx: Context, entries: Sequence[tuple[str, input_ast.Expr]]
+) -> tuple[query.OutputColumn, ...]:
+    """Check each output column in `ctx`, the context of the domain variables. The column
+    names are distinct: each is compared with the names after it, and with those alone, so
+    a column may carry the name of a domain variable or of a constant."""
+    match entries:
+        case []:
+            return ()
+        case [(name, e), *rest]:
+            checked = _check_output(ctx, rest)
+            if any(column.name == name for column in checked):
+                raise _error(f"duplicate output column {name}", e)
+            ty, typed = infer(ctx, e)
+            return (query.OutputColumn(name, ty, typed), *checked)
+    raise AssertionError("unreachable")
 
 
 def _order_entry(ctx: Context, entry: input_ast.OrderEntry) -> query.OrderEntry:
@@ -233,7 +246,7 @@ def check_query(database: Database, source: input_ast.Query) -> query.Query:
         source.condition if source.condition is not None else input_ast.BoolLit(True)
     )
     condition = check(ctx, condition_source, BoolType())
-    output = tuple(_output_column(ctx, name, e) for name, e in source.output)
+    output = _check_output(ctx, source.output)
     order = tuple(
         _order_entry(_extend_output(ctx, output), entry) for entry in source.order or ()
     )

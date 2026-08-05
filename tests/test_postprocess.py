@@ -34,19 +34,20 @@ FUNCTIONS = {f.name: f for f in TOY.post_functions}
 Row = list[tuple[str, object]]
 
 
-def _declared(value: object, ty: Ty | None) -> Ty:
-    """The type a supplied row value stands at."""
-    match ty, value:
-        case (declared, _) if declared is not None:
-            return declared
-        case (_, bool()):
-            return BoolType()
-        case (_, int()):
-            return IntType()
-        case (_, str()):
-            return StringType()
-        case _:
-            return ListType(IntType())
+def _declared(value: object, override: Ty | None) -> Ty:
+    """The type a supplied row value stands at; `override` names it for an absent one."""
+    if override is not None:
+        return override
+    else:
+        match value:
+            case bool():
+                return BoolType()
+            case int():
+                return IntType()
+            case str():
+                return StringType()
+            case _:
+                return ListType(IntType())
 
 
 def _post(row: Row, entries: list[tuple[str, str]], ty: Ty | None = None) -> Row:

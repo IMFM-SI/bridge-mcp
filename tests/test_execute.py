@@ -7,6 +7,7 @@ from collections.abc import Iterator
 import pytest
 
 from bridge_mcp.mathql.databases.math_data import database
+from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import database_path, run_query
 from tests.toy import DATABASE as TOY
 
@@ -115,17 +116,16 @@ def test_a_row_is_pairs_in_output_order(connection: sqlite3.Connection) -> None:
     assert [name for name, _ in rows[0]] == ["zeta", "alpha", "mu", "beta"]
 
 
-def test_a_repeated_output_name_keeps_both_columns(connection: sqlite3.Connection) -> None:
-    rows = run_query(
-        connection,
-        database,
-        {
-            "domains": [["g", "Graph"]],
-            "output": [["n", "g.num_vertices"], ["n", "g.num_edges"]],
-            "condition": "g.num_vertices == 3 && g.num_edges == 2",
-        },
-    )
-    assert rows == [[("n", 3), ("n", 2)]]
+def test_a_repeated_output_name_is_rejected(connection: sqlite3.Connection) -> None:
+    with pytest.raises(MathQLError):
+        run_query(
+            connection,
+            database,
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["n", "g.num_vertices"], ["n", "g.num_edges"]],
+            },
+        )
 
 
 def test_postprocess_appends_its_columns(connection: sqlite3.Connection) -> None:
