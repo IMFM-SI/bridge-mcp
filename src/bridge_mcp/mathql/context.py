@@ -43,11 +43,21 @@ Entry = TypeEntry | DomainEntry
 
 
 @dataclass(frozen=True)
+class Signature:
+    """A function's argument types and its result type."""
+
+    arg_types: tuple[Ty, ...]
+    result_ty: Ty
+
+
+@dataclass(frozen=True)
 class Context:
-    """The domains available and the entry of each identifier in scope."""
+    """The domains available, the entry of each identifier in scope, and the signature of
+    each function. Identifiers and functions form separate namespaces."""
 
     domains: Mapping[str, DomainTy]
     idents: Mapping[str, Entry] = field(default_factory=dict)
+    functions: Mapping[str, Signature] = field(default_factory=dict)
 
     def get_ident(self, name: str) -> Ty:
         match self.idents.get(name):
@@ -66,6 +76,13 @@ class Context:
                 raise MathQLError(f"{name} is a constant but a domain was expected")
             case None:
                 raise MathQLError(f"unknown domain name {name}")
+
+    def get_function(self, name: str) -> Signature:
+        match self.functions.get(name):
+            case None:
+                raise MathQLError(f"unknown function {name}")
+            case signature:
+                return signature
 
     def get_domain(self, domain: str) -> DomainTy:
         match self.domains.get(domain):

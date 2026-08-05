@@ -5,7 +5,7 @@ import pytest
 
 from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
-from bridge_mcp.mathql.database import Column, Database, ForeignKey, Schema
+from bridge_mcp.mathql.database import Column, Database, ForeignKey, Schema, SqlFunction
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.query import Query
 from bridge_mcp.mathql.query_json import from_json
@@ -36,6 +36,7 @@ TOY = Database(
     constants=(),
     domains={"Graph": GRAPH, "Maniplex": MANIPLEX},
     examples=(),
+    sql_functions=(SqlFunction("size", (StringType(),), IntType(), "length"),),
 )
 
 
@@ -146,3 +147,37 @@ def test_tuples_projections_and_conditional() -> None:
 def test_condition_does_not_see_aliases() -> None:
     with pytest.raises(MathQLError):
         _typed({"domains": [["g", "Graph"]], "output": [["m", "g.n"]], "condition": "m > 0"})
+
+
+def test_call_compiles_to_its_sql_name() -> None:
+    rendered = _rendered(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.n"]],
+            "condition": "size(g.graph6) > 2",
+        }
+    )
+    assert rendered.endswith('WHERE ("length"("g"."graph6") > 2)')
+
+
+def test_call_nests_and_serves_as_an_output_column() -> None:
+    rendered = _rendered(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["k", "size(g.graph6)"]],
+            "condition": "size(g.graph6) > size('ab')",
+        }
+    )
+    assert '"length"("g"."graph6") AS "k"' in rendered
+    assert '("length"("g"."graph6") > "length"(\'ab\'))' in rendered
+
+
+def test_a_call_is_legal_in_an_order_key() -> None:
+    rendered = _rendered(
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.n"]],
+            "order": [["size(g.graph6)", "desc"]],
+        }
+    )
+    assert rendered.endswith('ORDER BY "length"("g"."graph6") DESC')

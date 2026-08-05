@@ -64,6 +64,14 @@ class Id:
 
 
 @dataclass(frozen=True)
+class Call:
+    """A function of the database applied to arguments, `f(e1, ..., en)`."""
+
+    name: str
+    args: tuple[Expr, ...]
+
+
+@dataclass(frozen=True)
 class Field:
     """A scalar field of the object denoted by `domain`."""
 
@@ -131,6 +139,7 @@ Expr = (
     | StrLit
     | Ident
     | Id
+    | Call
     | Field
     | UnOp
     | BinOp

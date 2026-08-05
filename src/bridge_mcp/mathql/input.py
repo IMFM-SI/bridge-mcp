@@ -63,6 +63,15 @@ class Obj:
 
 
 @dataclass(frozen=True)
+class Call:
+    """A function applied to arguments, `f(e1, ..., en)`."""
+
+    name: str
+    args: tuple[Expr, ...]
+    span: Span | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True)
 class Field:
     expr: Expr
     label: str
@@ -138,6 +147,7 @@ Expr = (
     | Ident
     | Id
     | Obj
+    | Call
     | Field
     | Proj
     | ListExpr

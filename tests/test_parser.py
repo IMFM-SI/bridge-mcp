@@ -29,8 +29,24 @@ def test_id_and_obj() -> None:
     assert p("Pair[1, 2]") == ast.Obj("Pair", (ast.IntLit(1), ast.IntLit(2)))
     assert p("Unit[]") == ast.Obj("Unit", ())
     assert p("Graph['abc'].n") == ast.Field(ast.Obj("Graph", (ast.StrLit("abc"),)), "n")
+
+
+def test_calls() -> None:
+    assert p("f(1, 2)") == ast.Call("f", (ast.IntLit(1), ast.IntLit(2)))
+    assert p("g()") == ast.Call("g", ())
+    assert p("f(g(1), 2)") == ast.Call("f", (ast.Call("g", (ast.IntLit(1),)), ast.IntLit(2)))
+    assert p("f(1, 2).0") == ast.Proj(ast.Call("f", (ast.IntLit(1), ast.IntLit(2))), 0)
+    assert p("size(g.graph6) > 2") == ast.Compare(
+        ComparisonOp.GT,
+        ast.Call("size", (ast.Field(ast.Ident("g"), "graph6"),)),
+        ast.IntLit(2),
+    )
     with pytest.raises(MathQLError):
-        p("foo(3)")  # id is the only known function
+        p("id()")  # id takes one object
+    with pytest.raises(MathQLError):
+        p("id(g, h)")
+    with pytest.raises(MathQLError):
+        p("if(3)")  # a keyword cannot name a function
 
 
 def test_field_chains() -> None:

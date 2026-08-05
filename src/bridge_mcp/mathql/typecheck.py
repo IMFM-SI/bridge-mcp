@@ -65,6 +65,11 @@ def infer(ctx: Context, e: input_ast.Expr) -> tuple[Ty, expr.Expr]:
             )
         case input_ast.Obj():
             raise _error("a bare object cannot appear in an expression", e)
+        case input_ast.Call(name, args):
+            signature = _at(e, lambda: ctx.get_function(name))
+            return signature.result_ty, expr.Call(
+                name, _check_tuple(ctx, e, args, signature.arg_types)
+            )
         case input_ast.Field(operand, label):
             domain, typed_domain = infer_domain(ctx, operand)
             ty = _at(e, lambda: ctx.get_input_field_ty(domain, label))

@@ -79,6 +79,14 @@ class Case:
 
 
 @dataclass(frozen=True)
+class Call:
+    """A SQL function applied to arguments."""
+
+    name: str
+    args: tuple[Expr, ...]
+
+
+@dataclass(frozen=True)
 class Json:
     """A `json` call: the canonical (minified) text of a JSON value."""
 
@@ -109,6 +117,7 @@ Expr = (
     | IsNull
     | IsNotNull
     | Case
+    | Call
     | Json
     | JsonArray
     | JsonExtract
@@ -209,6 +218,8 @@ def render(e: Expr) -> str:
             return f"({render(expr)} IS NOT NULL)"
         case Case(cond, then_, else_):
             return f"(CASE WHEN {render(cond)} THEN {render(then_)} ELSE {render(else_)} END)"
+        case Call(name, args):
+            return f"{render_ident(name)}({', '.join(render(arg) for arg in args)})"
         case Json(expr):
             return f"json({render(expr)})"
         case JsonArray(items):

@@ -3,7 +3,7 @@
 import pytest
 
 from bridge_mcp.mathql import input as ast
-from bridge_mcp.mathql.context import Context, DomainTy, InputField
+from bridge_mcp.mathql.context import Context, DomainTy, InputField, Signature
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.operators import Direction
 from bridge_mcp.mathql.parser import parse_expression
@@ -22,7 +22,10 @@ MANIPLEX = DomainTy(
     input_fields={"mid": InputField(IntType(), True), "size": InputField(IntType(), False)},
     domain_fields={"skeleton": "Graph"},
 )
-TOY = Context(domains={"Graph": GRAPH, "Maniplex": MANIPLEX})
+TOY = Context(
+    domains={"Graph": GRAPH, "Maniplex": MANIPLEX},
+    functions={"size": Signature((StringType(),), IntType())},
+)
 
 
 def _query(
@@ -111,3 +114,19 @@ def test_infer_directly() -> None:
     assert int_ty == IntType()
     bool_ty, _ = infer(ctx, parse_expression("g.planar && g.n > 0"))
     assert bool_ty == BoolType()
+
+
+def test_function_calls() -> None:
+    assert _elaborates([("n", "g.n")], "size(g.graph6) > 2")
+    assert _elaborates([("k", "size(g.graph6)")], "size(g.graph6) > size('ab')")
+    assert not _elaborates([("n", "g.n")], "size(g.n) > 2")  # the argument is an int
+    assert not _elaborates([("n", "g.n")], "size() > 2")  # too few arguments
+    assert not _elaborates([("n", "g.n")], "size('a', 'b') > 2")  # too many
+    assert not _elaborates([("n", "foo(3)")], "true")  # foo is in no function table
+    assert not _elaborates([("n", "g.n")], "size(g.graph6)")  # a condition is checked at bool
+
+
+def test_a_call_denotes_no_object() -> None:
+    ctx = TOY.extend_domain_ident("g", "Graph")
+    with pytest.raises(MathQLError):
+        infer(ctx, parse_expression("size(g.graph6).n"))

@@ -6,7 +6,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.context import Context, DomainTy, Entry, InputField, TypeEntry
+from bridge_mcp.mathql.context import (
+    Context,
+    DomainTy,
+    Entry,
+    InputField,
+    Signature,
+    TypeEntry,
+)
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.types import Ty
 from bridge_mcp.mathql.types import render as render_type
@@ -62,6 +69,20 @@ class Constant:
 
 
 @dataclass(frozen=True)
+class SqlFunction:
+    """A function callable in the condition, the output, and the order: its MathQL name,
+    its signature, and the SQL function it compiles to."""
+
+    name: str
+    arg_types: tuple[Ty, ...]
+    result_ty: Ty
+    sql_name: str
+
+    def signature(self) -> Signature:
+        return Signature(self.arg_types, self.result_ty)
+
+
+@dataclass(frozen=True)
 class Example:
     note: str
     query: Mapping[str, object]
@@ -73,6 +94,7 @@ class Database:
     constants: tuple[Constant, ...]
     domains: Mapping[str, Schema]
     examples: tuple[Example, ...]
+    sql_functions: tuple[SqlFunction, ...] = ()
 
     def domain_context(self) -> dict[str, DomainTy]:
         return {
@@ -88,7 +110,11 @@ class Database:
 
     def context(self) -> Context:
         idents: dict[str, Entry] = {c.name: TypeEntry(c.ty) for c in self.constants}
-        return Context(domains=self.domain_context(), idents=idents)
+        return Context(
+            domains=self.domain_context(),
+            idents=idents,
+            functions={f.name: f.signature() for f in self.sql_functions},
+        )
 
     def describe(self) -> dict[str, object]:
         """The schema as JSON: the overview, each domain with its input and domain

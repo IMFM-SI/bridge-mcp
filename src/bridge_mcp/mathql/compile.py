@@ -35,11 +35,19 @@ ContextEntry = DomainEntry | ConstEntry
 
 @dataclass(frozen=True)
 class SqlContext:
-    """The resolution context of a compilation: the entry of each identifier and the
-    schema of each domain."""
+    """The resolution context of a compilation: the entry of each identifier, the schema
+    of each domain, and the SQL function each MathQL function compiles to."""
 
     idents: Mapping[str, ContextEntry]
     schemas: Mapping[str, Schema]
+    functions: Mapping[str, str]
+
+    def get_function(self, name: str) -> str:
+        match self.functions.get(name):
+            case None:
+                raise MathQLError(f"unknown function {name}")
+            case sql_name:
+                return sql_name
 
     def get_schema(self, domain: str) -> Schema:
         match self.schemas.get(domain):
@@ -181,6 +189,9 @@ def compile_expr(ctx: SqlContext, state: CompileState, e: expr.Expr) -> sql.Expr
         case expr.Field(domain, label):
             alias, name = compile_domain(ctx, state, domain)
             return sql.Col(alias, ctx.get_column(name, label).column)
+        case expr.Call(name, args):
+            compiled = tuple(compile_expr(ctx, state, arg) for arg in args)
+            return sql.Call(ctx.get_function(name), compiled)
         case expr.UnOp(op, operand):
             return sql.UnOp(op, compile_expr(ctx, state, operand))
         case expr.BinOp(op, left, right):
@@ -233,10 +244,12 @@ def compile_query(database: Database, q: Query) -> sql.Query:
         **{c.name: ConstEntry(c.sql) for c in database.constants},
         **{b.var: DomainEntry(b.domain) for b in q.variables},
     }
-    ctx = SqlContext(idents=idents, schemas=database.domains)
+    functions = {f.name: f.sql_name for f in database.sql_functions}
+    ctx = SqlContext(idents=idents, schemas=database.domains, functions=functions)
     aliased = SqlContext(
         idents={**idents, **{o.name: ConstEntry(sql.Ref(o.name)) for o in q.output}},
         schemas=database.domains,
+        functions=functions,
     )
     state = CompileState(taken=[b.var for b in q.variables], joins=[], hoisted={})
     output = tuple((compile_expr(ctx, state, o.expr), o.name) for o in q.output)
