@@ -1,5 +1,6 @@
 """End-to-end checks against the bundled database, skipped when it is absent."""
 
+import dataclasses
 import sqlite3
 from collections.abc import Iterator
 
@@ -7,6 +8,7 @@ import pytest
 
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path, run_query
+from tests.toy import DATABASE as TOY
 
 DB = database_path()
 
@@ -124,3 +126,41 @@ def test_a_repeated_output_name_keeps_both_columns(connection: sqlite3.Connectio
         },
     )
     assert rows == [[("n", 3), ("n", 2)]]
+
+
+def test_postprocess_appends_its_columns(connection: sqlite3.Connection) -> None:
+    with_plus = dataclasses.replace(database, post_functions=TOY.post_functions)
+    rows = run_query(
+        connection,
+        with_plus,
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["n", "g.num_vertices"]],
+            "condition": "g.num_vertices == 3 && g.num_edges == 3",
+            "postprocess": [["k", "plus(n, 1)"], ["m", "k * 2"]],
+        },
+    )
+    assert rows == [[("n", 3), ("k", 4), ("m", 8)]]
+
+
+def test_the_two_stages_agree_on_the_same_row(connection: sqlite3.Connection) -> None:
+    """`defined` and a list comparison answer alike in a condition and in postprocess."""
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [
+            ["d", "g.diameter"],
+            ["ds", "g.degree_sequence"],
+            ["in_sql_defined", "defined g.diameter"],
+            ["in_sql_equal", "g.degree_sequence == [2, 2, 2]"],
+        ],
+        "condition": "g.num_vertices <= 3",
+        "postprocess": [
+            ["in_post_defined", "defined d"],
+            ["in_post_equal", "ds == [2, 2, 2]"],
+        ],
+    }
+    rows = [dict(row) for row in run_query(connection, database, request)]
+    assert rows
+    assert all(row["in_sql_defined"] == row["in_post_defined"] for row in rows)
+    assert all(row["in_sql_equal"] == row["in_post_equal"] for row in rows)
+    assert {row["in_post_defined"] for row in rows} == {True, False}  # both cases occur
