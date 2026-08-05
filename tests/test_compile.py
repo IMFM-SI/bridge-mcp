@@ -165,3 +165,24 @@ def test_postprocess_contributes_nothing_to_the_sql() -> None:
     )
     assert '"n"' in rendered
     assert '"k"' not in rendered
+
+
+def test_a_query_over_no_table_has_no_from_clause() -> None:
+    assert _rendered({"domains": [], "output": [["x", "2 + 2"]]}) == (
+        'SELECT (2 + 2) AS "x" WHERE 1'
+    )
+
+
+def test_a_hoisted_join_over_no_table_takes_a_one_row_left_operand() -> None:
+    assert _rendered({"domains": [], "output": [["n", "Graph['abc'].n"]]}) == (
+        'SELECT "Graph"."n" AS "n" FROM (SELECT 1)'
+        ' LEFT JOIN "graph" AS "Graph" ON "Graph"."graph6" = \'abc\' WHERE 1'
+    )
+
+
+def test_a_query_naming_no_column_selects_a_placeholder() -> None:
+    assert (
+        _rendered({"domains": [["g", "Graph"]], "output": [], "condition": "g.n > 3"})
+        == 'SELECT 1 FROM "graph" AS "g" WHERE ("g"."n" > 3)'
+    )
+    assert _rendered({"domains": [], "output": []}) == "SELECT 1 WHERE 1"

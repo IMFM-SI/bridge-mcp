@@ -164,3 +164,45 @@ def test_the_two_stages_agree_on_the_same_row(connection: sqlite3.Connection) ->
     assert all(row["in_sql_defined"] == row["in_post_defined"] for row in rows)
     assert all(row["in_sql_equal"] == row["in_post_equal"] for row in rows)
     assert {row["in_post_defined"] for row in rows} == {True, False}  # both cases occur
+
+
+def test_a_query_over_constants_touches_no_table(connection: sqlite3.Connection) -> None:
+    rows = run_query(
+        connection, database, {"domains": [], "output": [["x", "2 + 2"], ["y", "'hi'"]]}
+    )
+    assert rows == [[("x", 4), ("y", "hi")]]
+
+
+def test_postprocess_alone_is_a_query(connection: sqlite3.Connection) -> None:
+    with_plus = dataclasses.replace(database, post_functions=TOY.post_functions)
+    rows = run_query(
+        connection,
+        with_plus,
+        {"domains": [], "output": [], "postprocess": [["k", "plus(2, 2)"]]},
+    )
+    assert rows == [[("k", 4)]]
+
+
+def test_a_false_condition_leaves_no_row(connection: sqlite3.Connection) -> None:
+    assert (
+        run_query(connection, database, {"domains": [], "output": [], "condition": "false"})
+        == []
+    )
+
+
+def test_naming_no_column_keeps_one_row_per_match(connection: sqlite3.Connection) -> None:
+    with_plus = dataclasses.replace(database, post_functions=TOY.post_functions)
+    request: dict[str, object] = {
+        "domains": [["g", "Graph"]],
+        "output": [],
+        "condition": "g.num_vertices == 3",
+        "postprocess": [["k", "plus(1, 1)"]],
+    }
+    rows = run_query(connection, with_plus, request)
+    counted = run_query(
+        connection,
+        database,
+        {**request, "output": [["n", "g.num_vertices"]], "postprocess": []},
+    )
+    assert len(rows) == len(counted) == 4
+    assert rows[0] == [("k", 2)]
