@@ -33,9 +33,7 @@ Expressions use fields (g.num_vertices), id(x) for an object's primary key, lite
 arithmetic (+ - *), comparisons (== != < <= > >=), booleans (&& || !), defined/undefined
 for absence, list and tuple literals ([1, 2] and (1, 'a'), a tuple projected with .0),
 and calls to the functions a database declares (f(x, y)). A comparison needs both sides
-the same type. String literals are single-quoted ('text', a literal quote doubled as '').
-ASCII operators are preferred; ∧ ∨ ¬ ≤ ≥ ≠ also work. Call the `grammar` tool for the full
-grammar."""
+the same type. Call the `grammar` tool for the full grammar."""
 
 
 def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
@@ -147,8 +145,8 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def grammar() -> str:
-        """The full query-language grammar: the JSON query shape, the types, the
-        expression grammar with precedence, and examples."""
+        """The full query-language grammar: the query shape, the result shape, the
+        domains, the types, and the expression grammar with precedence."""
         return (
             resources.files("bridge_mcp.mathql")
             .joinpath("query-grammar.md")

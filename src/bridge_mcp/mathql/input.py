@@ -1,7 +1,7 @@
 """The input syntax: the untyped output of the parser, before type-checking.
 
 Each expression node carries an optional source `span`, set by the parser and excluded
-from equality, so type errors can point at the offending sub-expression.
+from equality. A type error is reported at the span of its sub-expression.
 """
 
 from __future__ import annotations

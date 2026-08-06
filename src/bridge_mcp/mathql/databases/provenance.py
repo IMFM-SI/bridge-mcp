@@ -40,8 +40,8 @@ PROVENANCE = Schema(
     },
     foreign_keys={"source": ForeignKey("Source", (("source", "id"),), "the source")},
     doc=(
-        "Trusting a field's sources suffices to trust its facts (a single fact may "
-        "need fewer); a field touched by several tools has several rows."
+        "The sources a field's facts rest on; a single fact may rest on fewer. "
+        "A field touched by several tools has several rows."
     ),
 )
 

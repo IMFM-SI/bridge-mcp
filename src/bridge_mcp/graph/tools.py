@@ -41,8 +41,8 @@ def _build(num_vertices: int, edges: list[list[int]]) -> networkx.Graph:
 def graph6_from_edges(num_vertices: int, edges: list[list[int]]) -> str:
     """Build a graph on vertices 0..num_vertices-1 with the given edges; return its graph6.
 
-    The result encodes the given labeling. The Graph database stores canonical graph6, so
-    match a stored graph with `is_isomorphic` or by its invariants.
+    The result encodes the given labeling. Match a stored graph with `is_isomorphic` or
+    by its invariants.
     """
     graph = networkx.Graph()
     graph.add_nodes_from(range(num_vertices))
