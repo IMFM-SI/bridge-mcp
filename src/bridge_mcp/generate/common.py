@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterable
-from importlib.metadata import version
 from pathlib import Path
+
+import bridge_mcp
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mathql" / "databases" / "math-data.db"
 
@@ -44,7 +45,7 @@ def bridge_mcp_source() -> SourceRow:
     return (
         "bridge-mcp",
         "bridge-mcp",
-        version("bridge-mcp"),
+        bridge_mcp.__version__,
         "facts computed by bridge-mcp itself: derived traits, rendered statements, "
         "Cayley graphs, automorphism identification, and bookkeeping fields",
         None,
