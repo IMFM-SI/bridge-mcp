@@ -64,8 +64,7 @@ def _build_instructions() -> str:
     default = next(iter(DATABASES), "")
     lines = [
         f"Databases: {', '.join(DATABASES)}. `query` and `describe` take a `database` "
-        f"parameter selecting one (default: {default}); `describe` with no arguments "
-        "lists them.",
+        f"parameter selecting one (default: {default}).",
         "",
     ]
     for name, (selected, _) in DATABASES.items():
@@ -99,24 +98,17 @@ def register(mcp: FastMCP) -> None:
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
     ) -> list[list[tuple[str, Any]]]:
-        """Run a MathQL query and return the matching rows.
-
-        Each row is a list of [column name, value] pairs: the output columns in
-        their given order, then the postprocess columns in theirs.
+        """Run a MathQL query and return the matching rows, each a list of
+        [column name, value] pairs. See the `grammar` tool for what a clause means.
 
         domains: variable bindings, e.g. [["g", "Graph"]].
         output: [column name, expression] pairs, in the order the columns are to
-            appear, e.g. [["g6", "id(g)"], ["edges", "g.num_edges"]]. Each
-            expression is over the bound variables (see the grammar tool).
-        condition: a boolean expression over the bound variables (optional).
-        order: [expression, "asc"|"desc"] pairs; the expressions may refer to the
-            output column names (optional).
+            appear, e.g. [["g6", "id(g)"], ["edges", "g.num_edges"]].
+        condition: a boolean expression (optional).
+        order: [expression, "asc"|"desc"] pairs (optional).
         limit: maximum number of rows (optional).
-        postprocess: [column name, expression] pairs appended to each row and
-            computed after the rows come back, each expression over the output
-            columns and any earlier entry (optional).
-        database: which database to query (optional; `describe` with an empty
-            argument list returns the list, the first entry being the default).
+        postprocess: [column name, expression] pairs (optional).
+        database: which database to query (optional; the default is the first).
         """
         selected, path = resolve(database)
         request: dict[str, Any] = {"domains": domains, "output": output}

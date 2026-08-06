@@ -260,8 +260,7 @@ def eval_postprocess(
 
 
 def _decode_row(q: query.Query, row: Sequence[Any]) -> list[tuple[str, object]]:
-    """One row's output cells, each paired with its column name, in output order. A query
-    naming no output column selects a placeholder, which is passed over here."""
+    """One row's output cells, each paired with its column name, in output order."""
     if q.output:
         return [
             (column.name, _decode_cell(column.ty, cell))

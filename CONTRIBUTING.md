@@ -47,6 +47,7 @@ You can also run the following commands:
 
 The bundled database regenerates end to end with
 
+    rm src/bridge_mcp/mathql/databases/math-data.db
     python -m bridge_mcp.generate all --gap <path-to-gap>
 
 which needs [nauty](https://pallini.di.uniroma1.it) (`geng` and `labelg` on the

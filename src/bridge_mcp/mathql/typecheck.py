@@ -237,12 +237,7 @@ def _check_postprocess(
 
 
 def check_query(database: Database, source: input_ast.Query) -> query.Query:
-    """Type-check a query, elaborating it into the typed query.
-
-    The output columns are checked in the context of the domain variables, the order keys
-    with the output aliases in scope, and the postprocess entries in the postprocess
-    context extended by the output columns.
-    """
+    """Type-check a query, elaborating it into the typed query."""
     ctx, bindings = _check_domains(database.sql_context(), source.domains)
     condition_source = (
         source.condition if source.condition is not None else input_ast.BoolLit(True)

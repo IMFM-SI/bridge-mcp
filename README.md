@@ -61,19 +61,6 @@ functions a database declares. For example, the trees on five vertices:
 }
 ```
 
-A query may close with a `postprocess` clause: further columns, appended to every row
-and computed after the rows come back rather than by the database. The entries are
-scoped in order, so each may name the output columns and any entry before it.
-
-```json
-{
-  "domains": [["g", "Graph"]],
-  "output": [["graph6", "g.graph6"], ["max", "g.max_degree"], ["min", "g.min_degree"]],
-  "condition": "g.num_vertices == 5",
-  "postprocess": [["spread", "max - min"], ["regular", "spread == 0"]]
-}
-```
-
 Beyond querying, the server offers tools that compute further with the objects a query
 finds. A graph comes back as its `graph6` string, a compact encoding that is opaque on
 its own; passing that string to the `edge_list` tool returns the graph's vertices and
