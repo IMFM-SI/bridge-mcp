@@ -134,8 +134,7 @@ class Database:
         )
 
     def post_context(self) -> Context:
-        """The context of the postprocess clause: the postprocess functions, to which the
-        type-checker adds the output columns."""
+        """The context of the postprocess clause: the postprocess functions."""
         return Context(
             domains={},
             idents={},

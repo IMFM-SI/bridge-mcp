@@ -178,8 +178,7 @@ def check(ctx: Context, e: input_ast.Expr, ty: Ty) -> expr.Expr:
 def _check_domains(
     ctx: Context, domains: tuple[input_ast.Binding, ...]
 ) -> tuple[Context, tuple[query.Binding, ...]]:
-    """Check the domain bindings. The variables are distinct, so one binding of a variable
-    is in scope wherever the variable appears."""
+    """Check the domain bindings. The variables are distinct."""
     for position, binding in enumerate(domains):
         if binding.domain not in ctx.domains:
             raise MathQLError(f"unknown domain {binding.domain}")
@@ -195,8 +194,7 @@ def _check_output(
     ctx: Context, entries: Sequence[tuple[str, input_ast.Expr]]
 ) -> tuple[query.OutputColumn, ...]:
     """Check each output column in `ctx`, the context of the domain variables. The column
-    names are distinct: each is compared with the names after it, and with those alone, so
-    a column may carry the name of a domain variable or of a constant."""
+    names are distinct from one another."""
     match entries:
         case []:
             return ()

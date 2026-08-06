@@ -278,8 +278,7 @@ def _render_from(q: Query) -> str:
 def render_query(q: Query) -> str:
     """Render a query to SQLite text, with a bare condition. Each output column is
     rendered as `<expr> AS <alias>`; a hoisted join renders as `LEFT JOIN`, so when it
-    matches no row its columns are NULL. A query naming no output column selects `1`,
-    which `_decode_row` passes over."""
+    matches no row its columns are NULL. A query naming no output column selects `1`."""
     joins = "".join(_render_join(join) for join in q.joins)
     columns = (
         ", ".join(f"{render(e)} AS {render_ident(alias)}" for e, alias in q.output)

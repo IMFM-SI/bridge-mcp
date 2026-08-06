@@ -102,7 +102,6 @@ def test_logic_evaluates_both_operands() -> None:
         ("k", False),
         ("m", True),
     ]
-    # `false && …` still evaluates the right operand, so an absent one is absent.
     assert _post([("n", None)], [("k", "false && n > 0")], IntType()) == [("k", None)]
 
 
@@ -199,9 +198,7 @@ VALUES: list[object] = [
 
 
 def test_canonical_text_survives_sqlite_json() -> None:
-    """A comparison in postprocess reads the canonical text of a decoded value, while the
-    same comparison in a condition reads `json()` of the stored text. The two agree when
-    the canonical text is what `json()` returns for it."""
+    """`json()` returns the canonical text of a value unchanged."""
     with sqlite3.connect(":memory:") as connection:
         for value in VALUES:
             text = canonical(value)
@@ -210,8 +207,7 @@ def test_canonical_text_survives_sqlite_json() -> None:
 
 
 def test_canonical_text_matches_the_stored_form() -> None:
-    """The generator stores a list column as minified JSON; `json()` of that text is what
-    the canonical form of the decoded value must equal."""
+    """The canonical form of a decoded value equals `json()` of its stored text."""
     with sqlite3.connect(":memory:") as connection:
         for value in VALUES:
             stored = json.dumps(value, separators=(",", ":"), ensure_ascii=False)

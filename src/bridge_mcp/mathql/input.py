@@ -178,8 +178,7 @@ class OrderEntry:
 @dataclass(frozen=True)
 class Query:
     """A query. `condition`, `order`, and `limit` are optional in the input; the
-    type-checker fills in `true`, the empty list, and none respectively. `postprocess`
-    defaults to the empty stage."""
+    type-checker fills in `true`, the empty list, and none respectively."""
 
     domains: tuple[Binding, ...]
     output: tuple[tuple[str, Expr], ...]

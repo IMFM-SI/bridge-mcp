@@ -48,7 +48,7 @@
      | IDENT "[" "]"                  -> obj_empty
      | IDENT "[" expr ("," expr)* "]" -> obj
      | IDENT "(" ")"                  -> call_empty
-     | IDENT "(" expr ("," expr)* ")" -> call     // "id" is a case of call; a keyword token would reserve it
+     | IDENT "(" expr ("," expr)* ")" -> call     // "id" is a case of call
      | IDENT                          -> ident
 
 IDENT: /[a-zA-Z][a-zA-Z0-9_]*/

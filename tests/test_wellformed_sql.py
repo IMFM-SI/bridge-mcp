@@ -1,5 +1,4 @@
-"""Every query the compiler emits parses: each rendering goes through SQLite's EXPLAIN,
-which parses and plans it without running it."""
+"""Every rendering the compiler emits parses, checked with EXPLAIN."""
 
 import sqlite3
 from typing import Any

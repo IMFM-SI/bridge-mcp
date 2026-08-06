@@ -43,7 +43,7 @@ You need to restart Claude Desktop for the setting to take effect.
 ## MathQL
 
 MathQL is a small, typed query language for asking mathematical questions about
-collections of mathematical objects. A query names one or more *domains* of objects,
+collections of mathematical objects. A query names the *domains* of objects it ranges over,
 gives a *condition* the objects must satisfy, and lists the result columns it
 *returns*, each an expression under a column name. It is type-checked and compiled to
 SQL, then run against the database that holds the objects. Each row comes back as a

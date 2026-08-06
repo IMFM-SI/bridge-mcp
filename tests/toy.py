@@ -1,9 +1,4 @@
-"""The toy database the type-checking, compilation, and postprocess suites share.
-
-One domain `Graph` with a string primary key and three further fields, a second domain
-linking to it, one SQL function registered under a SQL name of its own, and one
-postprocess function.
-"""
+"""The toy database the type-checking, compilation, and postprocess suites share."""
 
 from collections.abc import Sequence
 
@@ -42,7 +37,6 @@ MANIPLEX = Schema(
 
 
 def plus(args: Sequence[object]) -> object:
-    """`plus : (int, int) -> int`."""
     match args:
         case [a, b] if type(a) is int and type(b) is int:
             return a + b

@@ -67,13 +67,12 @@ def _decode_cell(ty: Ty, cell: Any) -> object:
 
 
 def canonical(value: object) -> str:
-    """The canonical JSON text of a value, as SQLite's `json` renders it: no spaces,
-    non-ASCII characters left as themselves, object keys sorted."""
+    """A value as minified JSON text in UTF-8, with object keys in sorted order."""
     return json.dumps(value, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
 
 
 def _as_int(value: object) -> int:
-    """`value` as an integer. A boolean is no integer, though `bool` subclasses `int`."""
+    """`value` as an integer, which a boolean is not."""
     if type(value) is int:
         return value
     else:
@@ -104,8 +103,7 @@ def _eval_unary_op(op: UnaryOp, value: object) -> object:
 
 
 def _eval_binary_op(op: BinaryOp, left: object, right: object) -> object:
-    """`&&` and `||` are strict: each coerces both operands, so an operand that is no
-    boolean makes the whole expression fail."""
+    """Apply a binary operator to two evaluated operands, coercing both."""
     match op:
         case BinaryOp.AND:
             return _as_bool(left) & _as_bool(right)
@@ -121,8 +119,8 @@ def _eval_binary_op(op: BinaryOp, left: object, right: object) -> object:
 
 
 def _comparison_keys(ty: Ty, left: object, right: object) -> tuple[Any, Any]:
-    """The pair of values a comparison at `ty` compares. A list or a product compares by
-    canonical JSON text, which is how SQLite compares `json(a)` to `json(b)`."""
+    """The pair of values a comparison at `ty` compares: the coerced scalars, or the
+    canonical text of a list or a product."""
     match ty:
         case IntType():
             return _as_int(left), _as_int(right)
@@ -136,7 +134,7 @@ def _comparison_keys(ty: Ty, left: object, right: object) -> tuple[Any, Any]:
 
 
 def _eval_comparison(op: ComparisonOp, ty: Ty, left: object, right: object) -> object:
-    """Compare at `ty`. An absent operand makes the comparison absent, as in SQL."""
+    """Compare at `ty`; an absent operand makes the comparison absent."""
     if left is None or right is None:
         return None
     else:
@@ -233,8 +231,8 @@ def eval_post_expr(env: PostEnvironment, e: expr.Expr) -> object:
 
 
 def _is_defined(env: PostEnvironment, e: expr.Expr) -> bool:
-    """Whether `e` evaluates to a value other than absent. A failed evaluation counts as
-    absent, so `defined` and `undefined` answer as `IS NOT NULL` and `IS NULL` do."""
+    """Whether `e` evaluates to a value other than absent, a failed evaluation counting
+    as absent."""
     try:
         return eval_post_expr(env, e) is not None
     except MathQLError:
