@@ -1,8 +1,7 @@
 """Fill the pibase_* tables of math-data.db from the π-Base bundle.
 
-Fetches the compiled bundle (or reads a local copy), computes the deductive
-closure with provenance, and rebuilds the pibase_* tables inside the existing
-database; the other tables are left untouched.
+Fetches the compiled bundle (or reads a local copy) and computes the deductive closure
+with provenance.
 """
 
 from __future__ import annotations

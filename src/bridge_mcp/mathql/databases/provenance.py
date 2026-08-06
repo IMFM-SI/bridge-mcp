@@ -1,7 +1,5 @@
 """The provenance domains of the `math_data` database: which sources — tools and
-upstream databases — the facts rest on. The semantics is an upper bound: a
-`Provenance` row means trusting its source suffices for the facts in that field,
-and any single fact may need fewer sources."""
+upstream databases — the facts rest on."""
 
 from bridge_mcp.mathql.database import Column, ForeignKey, Schema
 from bridge_mcp.mathql.types import StringType

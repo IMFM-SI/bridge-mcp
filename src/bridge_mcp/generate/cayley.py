@@ -3,9 +3,8 @@
 For every group of order up to `MAX_ORDER`, GAP emits the undirected simple
 Cayley graph on a minimal generating set (edges by right multiplication,
 identity excluded); nauty's `labelg` canonicalizes the graph6 form, which is
-then keyed into the graph table — reusing an existing row when the graph is
-already present — with the cheap invariants computed and the exponential ones
-left NULL. Each group row records its generators and its graph.
+then keyed into the graph table, reusing an existing row when the graph is already
+present. Each group row records its generators and its graph.
 """
 
 from __future__ import annotations

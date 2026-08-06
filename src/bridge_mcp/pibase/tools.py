@@ -13,11 +13,8 @@ from rapidfuzz import fuzz, process, utils
 from bridge_mcp.mathql.execute import database_path
 
 INSTRUCTIONS = """## Search and derivation
-- `search` — fuzzy-find a π-Base space, property, or theorem, or a group, by
-  name; aliases and misspellings match. Returns uids for use in MathQL
-  queries (a group's uid is its [order, index] pair).
-- `derivation` — the derivation tree of a π-Base trait: the provenance
-  (theorem and premises) of every derived step, down to the asserted facts."""
+`search` and `derivation` are the entry points into π-Base. `search` returns the uids a
+MathQL query needs; a group's uid is its [order, index] pair."""
 
 KINDS = ("space", "property", "theorem", "group")
 

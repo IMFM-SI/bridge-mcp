@@ -1,9 +1,4 @@
-"""The graph component's tools, networkx-backed.
-
-A `graph6` string encodes a graph; these tools build one from an edge list or adjacency
-matrix, decode and analyze any graph6, compare graphs, and draw one. Vertices are numbered
-0..n-1.
-"""
+"""The graph component's tools, networkx-backed."""
 
 import math
 from collections.abc import Callable
@@ -21,15 +16,12 @@ analyze and compare any graph6, or draw a graph for quick visual inspection:
 - construct: `graph6_from_edges`, `graph6_from_adjacency` → a graph6 string;
 - decode: `edge_list`, `neighbors`, `shortest_path`, `connected_components`;
 - invariants: `invariants` (the full set for any graph);
-- witnesses: `max_clique`, `max_independent_set`, `minimum_vertex_cover`, `coloring`
-  (greedy), `optimal_coloring` (exact), `maximum_matching`, `center`, `periphery`,
-  `articulation_points`, `bridges`, `spanning_tree`;
+- witnesses: `max_clique`, `max_independent_set`, `minimum_vertex_cover`, `coloring`,
+  `optimal_coloring`, `maximum_matching`, `center`, `periphery`, `articulation_points`,
+  `bridges`, `spanning_tree`;
 - compare: `is_isomorphic`, `is_subgraph`, `is_induced_subgraph`;
-- centrality: `centrality` (degree / betweenness / closeness / pagerank);
-- visualize (unlabeled circles, for quick inspection, shown inline): `draw_graph6` (from a
-  graph6) or `draw_graph` (from num_vertices and edges) → a compact SVG, optionally shaded
-  by a vertex coloring; `layout` (num_vertices and edges) → vertex coordinates for drawing
-  it yourself."""
+- centrality: `centrality`;
+- visualize: `draw_graph6`, `draw_graph`, `layout`."""
 
 
 def _decode(graph6: str) -> networkx.Graph:
@@ -49,9 +41,8 @@ def _build(num_vertices: int, edges: list[list[int]]) -> networkx.Graph:
 def graph6_from_edges(num_vertices: int, edges: list[list[int]]) -> str:
     """Build a graph on vertices 0..num_vertices-1 with the given edges; return its graph6.
 
-    The result encodes this labeling and is not necessarily nauty's canonical form, so it
-    need not equal the graph6 stored in the Graph database; to find a graph there, query by
-    invariants or use `is_isomorphic`.
+    The result encodes the given labeling. The Graph database stores canonical graph6, so
+    match a stored graph with `is_isomorphic` or by its invariants.
     """
     graph = networkx.Graph()
     graph.add_nodes_from(range(num_vertices))
@@ -61,11 +52,8 @@ def graph6_from_edges(num_vertices: int, edges: list[list[int]]) -> str:
 
 
 def graph6_from_adjacency(matrix: list[list[int]]) -> str:
-    """Build a graph from a 0/1 adjacency matrix; return its graph6.
-
-    The result is not necessarily nauty's canonical form, so it need not equal the graph6
-    stored in the Graph database (see `graph6_from_edges`).
-    """
+    """Build a graph from a 0/1 adjacency matrix; return its graph6, as in
+    `graph6_from_edges`."""
     n = len(matrix)
     graph = networkx.Graph()
     graph.add_nodes_from(range(n))
@@ -118,10 +106,7 @@ def connected_components(graph6: str) -> list[list[int]]:
 
 
 def invariants(graph6: str) -> dict[str, object]:
-    """All `Graph` invariants computed for the given graph: order, size, degree sequence,
-    regularity, components, connectivity, diameter, radius, girth, the tree/forest/
-    bipartite/planar/eulerian flags, triangle count, clique number, independence number,
-    chromatic number, and automorphism count."""
+    """All `Graph` invariants computed for the given graph; `describe` lists the fields."""
     return all_invariants(_decode(graph6))
 
 
@@ -268,11 +253,7 @@ _SVG_PALETTE = [
 
 
 def _svg(graph: networkx.Graph, vertex_coloring: list[list[int]] | None) -> str:
-    # Hand-built rather than via matplotlib's SVG backend: that backend wraps the drawing in
-    # page-sized scaffolding (a background rectangle, an axes group, clip-path definitions,
-    # RDF metadata) — kilobytes of noise around a few-node graph. Emitting <line>/<circle>
-    # directly keeps it minimal. Edges use `currentColor` so the drawing follows the host's
-    # light/dark theme; node fills stay literal so a vertex coloring keeps its meaning.
+    # Edges are stroked with `currentColor`; node fills are literal palette colors.
     color_of = {vertex: color for vertex, color in (vertex_coloring or [])}
     positions = networkx.spring_layout(graph, seed=0)
     xs = [x for x, _ in positions.values()]
@@ -324,11 +305,8 @@ def draw_graph(
     edges: list[list[int]],
     vertex_coloring: list[list[int]] | None = None,
 ) -> str:
-    """Draw a graph on vertices 0..num_vertices-1 with the given edges as a compact SVG.
-
-    Unlabeled circles and edges, for quick visual inspection, meant to be shown inline. Pass
-    `vertex_coloring` (a list of [vertex, color] pairs) to shade vertices by color class.
-    """
+    """Draw a graph on vertices 0..num_vertices-1 with the given edges, as in
+    `draw_graph6`."""
     return _svg(_build(num_vertices, edges), vertex_coloring)
 
 

@@ -1,8 +1,5 @@
-"""The generation driver: `python -m bridge_mcp.generate <target>`.
-
-Targets run in dependency order; `graphs` creates the database and refuses to
-overwrite it, the others rebuild their own tables inside it.
-"""
+"""The generation driver: `python -m bridge_mcp.generate <target>`. Targets run in
+dependency order."""
 
 import argparse
 import logging

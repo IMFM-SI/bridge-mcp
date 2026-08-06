@@ -1,9 +1,5 @@
-"""The `sym_ob_small` database: regular rank-4 maniplexes with their flag graphs,
-skeleta, and canonical labelings.
-
-`Maniplex` links through `CanonicalLabeling` to `Graph`, so reaching a maniplex's flag
-graph is a two-hop chain of domain fields.
-"""
+"""The `sym_ob_small` database: regular rank-4 maniplexes and the graphs derived from
+them."""
 
 from importlib import resources
 from pathlib import Path

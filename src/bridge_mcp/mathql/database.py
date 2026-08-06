@@ -142,8 +142,7 @@ class Database:
         )
 
     def describe(self) -> dict[str, object]:
-        """The schema as JSON: the overview, each domain with its input and domain
-        fields, the constants, and the example queries."""
+        """The schema as JSON."""
         return {
             "overview": self.overview,
             "domains": [

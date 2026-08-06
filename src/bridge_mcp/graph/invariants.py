@@ -1,10 +1,6 @@
 """Graph invariants computed with networkx, shared by the `invariants` tool and the
-database generator.
-
-`girth`, `minimal_coloring`/`chromatic_number`, and `automorphism_count` are the exact
-computations networkx does not provide directly; `all_invariants` bundles the full set the
-`Graph` schema records, as JSON-serializable values.
-"""
+database generator. `girth`, `minimal_coloring`/`chromatic_number` and
+`automorphism_count` are computed here; the rest come from networkx."""
 
 from __future__ import annotations
 
