@@ -37,7 +37,8 @@ the same type. Call the `grammar` tool for the full grammar."""
 
 
 def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
-    """The instruction lines for one database: overview, domains, two examples."""
+    """The instruction lines for one database: overview, domains, functions, two
+    examples."""
     lines = [f"## Database `{name}`", schema["overview"], "", "### Domains and fields"]
     for domain in schema["domains"]:
         lines.append(f"- {domain['name']}: {domain['doc']}")
@@ -52,6 +53,18 @@ def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
             )
             for field in domain["domainFields"]:
                 lines.append(f"    {field['label']} → {field['domain']} — {field['doc']}")
+    for key, where in (
+        ("sqlFunctions", "`condition`, `output` and `order`"),
+        ("postFunctions", "`postprocess`"),
+    ):
+        if schema[key]:
+            lines += ["", f"### Functions callable in {where}"]
+            for function in schema[key]:
+                arguments = ", ".join(function["arguments"])
+                lines.append(
+                    f"- {function['name']}({arguments}) : {function['result']}"
+                    f" — {function['doc']}"
+                )
     lines += ["", "### Examples (call `describe` for the full list)"]
     for example in schema["examples"][:2]:
         lines.append(f"- {example['note']}: {json.dumps(example['query'])}")
@@ -128,7 +141,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def describe(database: str | None = None) -> dict[str, object]:
-        """Describe a database: its domains, fields, constants, and examples.
+        """Describe a database: its domains, fields, constants, functions, and examples.
 
         With no `database`, list the available databases and their overviews.
         """

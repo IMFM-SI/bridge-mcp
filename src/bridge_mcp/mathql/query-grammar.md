@@ -148,7 +148,7 @@ The meaning and types of the above expressions is as follows:
 - `f(e₁, …, eₙ)` — the function `f` applied to the given arguments; its type is `f`'s
   declared result type. Each database declares its functions in two groups: those
   available in `condition`, `output` and `order`, and those available in
-  `postprocess`.
+  `postprocess`. The `describe` tool lists both groups with their signatures.
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
 - `42` – integer literal of type `int`

@@ -5,6 +5,7 @@ from importlib import resources
 from pathlib import Path
 
 from bridge_mcp.mathql.database import Column, Database, Example, ForeignKey, Schema
+from bridge_mcp.mathql.functions import FUNCTIONS
 from bridge_mcp.mathql.types import (
     BoolType,
     IntType,
@@ -271,5 +272,19 @@ database = Database(
                 "limit": 5,
             },
         ),
+        Example(
+            "the edges of the skeleta of the smallest maniplexes",
+            {
+                "domains": [["m", "Maniplex"]],
+                "output": [
+                    ["id", "id(m)"],
+                    ["sparse6", "m.skeleton.graph.sparse6"],
+                ],
+                "order": [["m.num_flags", "asc"]],
+                "limit": 3,
+                "postprocess": [["edges", "edgeList(sparse6)"]],
+            },
+        ),
     ),
+    post_functions=FUNCTIONS,
 )

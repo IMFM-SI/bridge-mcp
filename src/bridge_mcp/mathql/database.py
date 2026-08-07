@@ -71,12 +71,13 @@ class Constant:
 @dataclass(frozen=True)
 class SqlFunction:
     """A function callable in the condition, the output, and the order: its MathQL name,
-    its signature, and the SQL function it compiles to."""
+    its signature, the SQL function it compiles to, and a human description."""
 
     name: str
     arg_types: tuple[Ty, ...]
     result_ty: Ty
     sql_name: str
+    doc: str = ""
 
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)
@@ -84,17 +85,28 @@ class SqlFunction:
 
 @dataclass(frozen=True)
 class PostFunction:
-    """A function callable in the postprocess clause: its MathQL name, its signature, and
-    an implementation over the decoded argument values, raising `MathQLError` on an
-    argument it rejects."""
+    """A function callable in the postprocess clause: its MathQL name, its signature, an
+    implementation over the decoded argument values, raising `MathQLError` on an argument
+    it rejects, and a human description."""
 
     name: str
     arg_types: tuple[Ty, ...]
     result_ty: Ty
     implementation: Callable[[Sequence[object]], object]
+    doc: str = ""
 
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)
+
+
+def _describe_function(function: SqlFunction | PostFunction) -> dict[str, object]:
+    """A function's name, argument types, result type, and description, as JSON."""
+    return {
+        "name": function.name,
+        "arguments": [render_type(ty) for ty in function.arg_types],
+        "result": render_type(function.result_ty),
+        "doc": function.doc,
+    }
 
 
 @dataclass(frozen=True)
@@ -161,5 +173,7 @@ class Database:
                 for name, schema in self.domains.items()
             ],
             "constants": [{"name": c.name, "type": render_type(c.ty)} for c in self.constants],
+            "sqlFunctions": [_describe_function(f) for f in self.sql_functions],
+            "postFunctions": [_describe_function(f) for f in self.post_functions],
             "examples": [{"note": e.note, "query": e.query} for e in self.examples],
         }
