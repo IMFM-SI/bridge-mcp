@@ -14,8 +14,23 @@ from bridge_mcp.connection import open_read_only, restrict_to_queries
 from bridge_mcp.mathql.execute import database_path
 
 INSTRUCTIONS = """## Search and derivation
-`search` and `derivation` are the entry points into π-Base. `search` returns the uids a
-MathQL query needs; a group's uid is its [order, index] pair."""
+π-Base records traits. A trait is a space, a property, and a boolean value recording
+whether the space has the property. A trait is asserted, or a theorem derives it from
+other traits. A space's uid reads `S000149`, a property's `P000053`, a theorem's
+`T000264`; a group's uid is its `[order, index]` pair.
+
+`search` matches text against the names and aliases of spaces and properties, the
+statements of theorems, and the structure descriptions of groups, and returns the uid of
+each match. `derivation` returns the tree of traits and theorems beneath one trait. The
+`Space`, `Property`, `Theorem`, `Trait` and `Group` domains hold the same objects for
+`query`.
+
+Examples:
+- `search("long line")` returns the spaces whose names match, in descending score.
+- `search("compact", kind="property")` returns the matching properties alone.
+- `search("dihedral", kind="group")` returns groups by structure description.
+- `derivation("S000149", "P000053")` returns the tree beneath the trait of the space
+  "Two-sided long line" and the property "Metrizable"."""
 
 KINDS = ("space", "property", "theorem", "group")
 
@@ -55,11 +70,17 @@ def _catalog() -> tuple[Entry, ...]:
 
 
 def search(text: str, kind: str | None = None, limit: int = 10) -> list[dict[str, object]]:
-    """Fuzzy-find π-Base spaces, properties, and theorems, and groups, by name.
+    """Match text against the names and aliases of π-Base spaces and properties, the
+    statements of theorems, and the structure descriptions of groups.
 
-    text: the name to look for; aliases and near-misses match too.
-    kind: restrict to "space", "property", "theorem", or "group" (optional).
-    limit: maximum number of results.
+    Each result is {"kind": "space", "property", "theorem" or "group"; "uid": the object's
+    uid, which for a group is its [order, index] pair; "name": the space's or property's
+    name, the theorem's statement, or the group's structure description; "score": the
+    match, from 0 to 100}. The results come in descending score, one per object.
+
+    text: the text to match; a near spelling matches too.
+    kind: restrict the results to one kind.
+    limit: how many results to return.
     """
     if kind is not None and kind not in KINDS:
         raise ValueError(f"unknown kind '{kind}'; expected one of {', '.join(KINDS)}")
@@ -86,11 +107,23 @@ def search(text: str, kind: str | None = None, limit: int = 10) -> list[dict[str
 
 
 def derivation(space: str, property: str) -> dict[str, object]:
-    """The derivation tree of a trait, unfolded from its stored provenance.
+    """The tree of traits and theorems beneath one trait of π-Base.
 
-    space, property: π-Base uids, e.g. "S000149" and "P000053"; find them with
-    `search`. Each node carries the property and its value, and is either
-    asserted or derived by a theorem from premise subtrees.
+    A trait is a space, a property, and a boolean value recording whether the space has
+    the property. The result is {"space": the space's name, "uid": the space's uid,
+    "trait": the root node}. A node is {"property": the property's name, "uid": the
+    property's uid, "value": the boolean} together with either {"asserted": true} or
+    {"theorem": the theorem's uid, "statement": what the theorem says, "premises": the
+    list of nodes the theorem drew on}:
+
+        {"space": "Two-sided long line", "uid": "S000149",
+         "trait": {"property": "Metrizable", "uid": "P000053", "value": false,
+                   "theorem": "T000264", "statement": "Metrizable ⇒ Pseudometrizable",
+                   "premises": [{"property": "Pseudometrizable", "uid": "P000121",
+                                 "value": false, "theorem": "T000268", ...}]}}
+
+    space: a space uid, "S000149"; `search` returns them.
+    property: a property uid, "P000053".
     """
     with contextlib.closing(_connect()) as connection:
         names = dict(connection.execute("SELECT uid, name FROM pibase_property"))
