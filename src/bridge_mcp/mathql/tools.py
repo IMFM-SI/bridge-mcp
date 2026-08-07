@@ -81,15 +81,20 @@ def register(mcp: FastMCP) -> None:
         database: str | None = None,
     ) -> list[list[tuple[str, Any]]]:
         """Run a MathQL query and return the matching rows, each a list of
-        [column name, value] pairs. See the `grammar` tool for what a clause means.
+        [column name, value] pairs, in the order `output` then `postprocess` name them.
 
-        domains: variable bindings, e.g. [["g", "Graph"]].
+        A query ranges over one object per domain variable and returns one row per
+        combination the condition holds of. The `grammar` tool gives the expression
+        grammar with its precedence, the types, and the full result shape.
+
+        domains: the variable bindings the query ranges over, e.g. [["g", "Graph"]].
         output: [column name, expression] pairs, in the order the columns are to
             appear, e.g. [["g6", "id(g)"], ["edges", "g.num_edges"]].
-        condition: a boolean expression (optional).
-        order: [expression, "asc"|"desc"] pairs (optional).
-        limit: maximum number of rows (optional).
-        postprocess: [column name, expression] pairs (optional).
+        condition: a boolean expression; a row appears when it holds.
+        order: [expression, "asc"|"desc"] pairs sorting the rows, applied in turn.
+        limit: how many rows to return at most.
+        postprocess: [column name, expression] pairs computed per row after the database
+            answers; each may name an output column and the entries before it.
         database: which database to query (optional; the default is the first).
         """
         opened = resolve(database)

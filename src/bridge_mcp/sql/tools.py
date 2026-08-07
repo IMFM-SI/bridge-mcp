@@ -11,10 +11,13 @@ from bridge_mcp.databases import DATABASES, Open
 
 INSTRUCTIONS = """## Running SQL directly
 `sql` runs one SELECT statement against a database and returns the rows. The connection is
-read-only and admits nothing but a query, so INSERT, UPDATE, DELETE, CREATE, DROP, ALTER,
-ATTACH and PRAGMA are all refused, and a statement can reach no file besides the database.
-For the tables and their columns, run
-`SELECT name, sql FROM sqlite_master WHERE type = 'table'`."""
+read-only and admits a query alone, so the database and every other file stay as they are.
+
+Examples:
+- `sql("SELECT name, sql FROM sqlite_master WHERE type = 'table'")` returns each table
+  with its CREATE TABLE text, which is where the schema comes from.
+- `sql("SELECT graph6, num_edges FROM graph WHERE num_vertices = 5 ORDER BY num_edges")`
+  returns rows of the graph table."""
 
 
 def register(mcp: FastMCP) -> None:
@@ -32,19 +35,17 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def sql(statement: str, database: str | None = None) -> list[list[tuple[str, Any]]]:
         """Run one SQL SELECT statement and return the rows, each a list of
-        [column name, value] pairs.
+        [column name, value] pairs, the names taken from the statement's result columns.
 
-        What is allowed: a single SELECT, with joins, subqueries, aggregates, common table
-        expressions and SQLite's built-in functions. What is refused: everything else.
-        The connection is read-only, so the database cannot be changed, and it admits only
-        queries, so INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, ATTACH, PRAGMA and
-        CREATE TEMP TABLE all fail with "not authorized". One statement runs per call.
+        The statement is a single SELECT, and may use joins, subqueries, aggregates,
+        common table expressions and SQLite's built-in functions. The connection is
+        read-only and admits a query alone, so every other statement — INSERT, UPDATE,
+        DELETE, CREATE, DROP, ALTER, ATTACH, PRAGMA, CREATE TEMP TABLE — ends in
+        "not authorized", leaving the database and every other file as they were.
 
-        To see the tables and their columns, run
+        The schema comes from `sqlite_master`, whose `sql` column holds each table's
+        CREATE TABLE text and which lists the views and indexes under `type`:
             SELECT name, sql FROM sqlite_master WHERE type = 'table'
-        whose `sql` column holds each table's full CREATE TABLE text; the same table lists
-        the views and indexes. `PRAGMA table_info` and `pragma_table_info()` are refused,
-        so `sqlite_master` is the way to read the schema.
 
         statement: the SELECT to run.
         database: which database to query (optional; the default is the first).
