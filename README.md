@@ -104,6 +104,18 @@ invariant's *value*, such as the clique number, a graph tool returns a *witness*
 actual maximum clique. Each tool carries its own description; a running server lists
 them all.
 
+## Choosing components
+
+The server is assembled from components: `mathql` (the `query`, `describe` and `grammar`
+tools), `pibase` (`search` and `derivation`), `networkx` (the graph tools), and `sql`.
+`bridge-mcp --components mathql,networkx` serves the named ones, and
+`bridge-mcp --list-components` prints the names. The default is `mathql,pibase,networkx`,
+so `sql` runs only when asked for.
+
+The `sql` component offers one tool, `sql`, which runs a single SELECT statement written by
+the caller. Its connection is read-only and admits nothing but a query, so a statement can
+neither change the database nor reach any other file.
+
 ## Development and contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for information on how to obtain the development version
