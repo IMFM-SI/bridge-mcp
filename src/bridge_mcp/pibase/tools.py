@@ -10,6 +10,7 @@ import sqlite3
 from mcp.server.fastmcp import FastMCP
 from rapidfuzz import fuzz, process, utils
 
+from bridge_mcp.connection import open_read_only, restrict_to_queries
 from bridge_mcp.mathql.execute import database_path
 
 INSTRUCTIONS = """## Search and derivation
@@ -23,7 +24,9 @@ Entry = tuple[str, object, str, str]
 
 
 def _connect() -> sqlite3.Connection:
-    return sqlite3.connect(f"file:{database_path()}?mode=ro", uri=True)
+    connection = open_read_only(database_path())
+    restrict_to_queries(connection)
+    return connection
 
 
 @functools.cache

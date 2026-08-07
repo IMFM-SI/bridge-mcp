@@ -12,11 +12,16 @@ from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.sym_ob_small import database, database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
+    return sql.render_query(
+        compile_query(
+            database, safe_alias(database), check_query(database, from_json(request))
+        )
+    )
 
 
 def test_two_hop_chain_shares_joins() -> None:
@@ -29,19 +34,15 @@ def test_two_hop_chain_shares_joins() -> None:
     )
     assert rendered.count("LEFT JOIN") == 2
     assert (
-        'LEFT JOIN "canonicallabeling" AS "m_skeleton"'
-        ' ON "m_skeleton"."id" = "m"."cl_one_skeleton_id"'
-    ) in rendered
-    assert (
-        'LEFT JOIN "graph" AS "m_skeleton_graph"'
-        ' ON "m_skeleton_graph"."id" = "m_skeleton"."graph_in_sparse6_id"'
-    ) in rendered
-    assert '("m_skeleton_graph"."order" > 4)' in rendered
+        'LEFT JOIN "canonicallabeling" AS c3 ON c3."id" = c1."cl_one_skeleton_id"' in rendered
+    )
+    assert 'LEFT JOIN "graph" AS c4 ON c4."id" = c3."graph_in_sparse6_id"' in rendered
+    assert '(c4."order" > 4)' in rendered
 
 
 def test_keyword_column_quoted() -> None:
     rendered = _rendered({"domains": [["g", "Graph"]], "output": [["n", "g.num_vertices"]]})
-    assert '"g"."order" AS "n"' in rendered
+    assert 'c1."order" AS c2' in rendered
 
 
 def test_tuple_comparison_canonicalized() -> None:
@@ -52,7 +53,7 @@ def test_tuple_comparison_canonicalized() -> None:
             "condition": "m.schlafli_symbol == (4, 8, 8)",
         }
     )
-    assert '(json("m"."schlafli_symbol") = json(json_array(4, 8, 8)))' in rendered
+    assert '(json(c1."schlafli_symbol") = json(json_array(4, 8, 8)))' in rendered
 
 
 def test_describe_lists_domain_fields() -> None:

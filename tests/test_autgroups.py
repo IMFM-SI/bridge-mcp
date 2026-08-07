@@ -12,6 +12,7 @@ from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
@@ -21,12 +22,14 @@ def test_multi_column_join_renders() -> None:
         "output": [["aut", "g.automorphism_group.structure_description"]],
     }
     rendered = sql.render_query(
-        compile_query(database, check_query(database, from_json(request)))
+        compile_query(
+            database, safe_alias(database), check_query(database, from_json(request))
+        )
     )
     assert (
-        'LEFT JOIN "small_group" AS "g_automorphism_group"'
-        ' ON "g_automorphism_group"."order" = "g"."aut_group_order"'
-        ' AND "g_automorphism_group"."index" = "g"."aut_group_index"'
+        'LEFT JOIN "small_group" AS c3'
+        ' ON c3."order" = c1."aut_group_order"'
+        ' AND c3."index" = c1."aut_group_index"'
     ) in rendered
 
 

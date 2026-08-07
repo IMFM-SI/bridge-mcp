@@ -5,14 +5,14 @@ LEFT JOINs."""
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import assert_never
 
 from bridge_mcp.mathql import expr, sql
 from bridge_mcp.mathql.database import Column, Database, Schema
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.query import Query
+from bridge_mcp.mathql.query import Binding, Query
 from bridge_mcp.mathql.types import ListType, ProductType
 
 
@@ -36,11 +36,13 @@ ContextEntry = DomainEntry | ConstEntry
 @dataclass(frozen=True)
 class SqlContext:
     """The resolution context of a compilation: the entry of each identifier, the schema
-    of each domain, and the SQL function each MathQL function compiles to."""
+    of each domain, the SQL function each MathQL function compiles to, and whether a name
+    is free of the column names of the database, and so usable as an alias."""
 
     idents: Mapping[str, ContextEntry]
     schemas: Mapping[str, Schema]
     functions: Mapping[str, str]
+    is_safe_alias: Callable[[str], bool]
 
     def get_function(self, name: str) -> str:
         match self.functions.get(name):
@@ -66,61 +68,55 @@ class SqlContext:
 
 @dataclass
 class CompileState:
-    """The state of a compilation: the aliases in use, the hoisted joins, and the
-    mapping from hoisted domain expressions to their alias and domain."""
+    """The state of a compilation: the next alias to try, the alias of each domain
+    variable, the hoisted joins, and the mapping from hoisted domain expressions to their
+    alias and domain."""
 
-    taken: list[str]
+    next_alias: int
+    var_alias: dict[str, str]
     joins: list[sql.Join]
     hoisted: dict[expr.Domain, tuple[str, str]]
 
 
-def _first_free(taken: list[str], stem: str) -> str:
-    """`stem`, or the first `stemk` (k >= 2) not in `taken`, case-insensitively."""
-    lowered = {name.lower() for name in taken}
-    candidates = (stem if i == 0 else f"{stem}{i + 1}" for i in itertools.count())
-    return next(name for name in candidates if name.lower() not in lowered)
+_ALIAS_FUEL = 1000
 
 
-def _fresh_alias(state: CompileState, stem: str) -> str:
-    """A fresh alias formed from `stem`, recorded as taken."""
-    name = _first_free(state.taken, stem)
-    state.taken.append(name)
-    return name
-
-
-def _domain_stem(d: expr.Domain) -> str:
-    """The stem of the alias of a hoisted domain expression."""
-    match d:
-        case expr.DomainIdent(name):
-            return name
-        case expr.Obj(domain, _):
-            return domain
-        case expr.DomainField(head, label):
-            return f"{_domain_stem(head)}_{label}"
-    assert_never(d)
+def _fresh_safe_alias(ctx: SqlContext, state: CompileState) -> str:
+    """The first of `c{n}`, `c{n+1}`, … that `ctx.is_safe_alias` accepts, counting from
+    the state's next alias, which then moves past it."""
+    indices = itertools.islice(itertools.count(state.next_alias), _ALIAS_FUEL)
+    for index in indices:
+        if ctx.is_safe_alias(f"c{index}"):
+            state.next_alias = index + 1
+            return f"c{index}"
+    raise MathQLError("internal error: no safe alias available")
 
 
 def _add_join(
+    ctx: SqlContext,
     state: CompileState,
     table: str,
-    stem: str,
     equalities: tuple[tuple[str, sql.Expr], ...],
 ) -> str:
     """Hoist a `LEFT JOIN` of `table` under a fresh alias, which is returned."""
-    alias = _fresh_alias(state, stem)
+    alias = _fresh_safe_alias(ctx, state)
     state.joins.append(sql.Join(table, alias, equalities))
     return alias
 
 
 def compile_domain(ctx: SqlContext, state: CompileState, d: expr.Domain) -> tuple[str, str]:
     """The alias of the row denoted by a domain expression, and its domain. The result
-    for an equal expression is stored and reused. A domain variable is its own alias; an
-    `Obj` or a domain-valued field is hoisted to a join."""
+    for an equal expression is stored and reused. A domain variable resolves to the alias
+    allocated for its binding; an `Obj` or a domain-valued field is hoisted to a join."""
     match d:
         case expr.DomainIdent(name):
             match ctx.idents.get(name):
                 case DomainEntry(domain):
-                    return name, domain
+                    match state.var_alias.get(name):
+                        case None:
+                            raise MathQLError(f"unbound domain variable {name}")
+                        case alias:
+                            return alias, domain
                 case ConstEntry():
                     raise MathQLError(f"{name} is not a domain variable")
                 case None:
@@ -132,7 +128,7 @@ def compile_domain(ctx: SqlContext, state: CompileState, d: expr.Domain) -> tupl
                 schema = ctx.get_schema(domain)
                 keys = tuple(compile_expr(ctx, state, arg) for arg in args)
                 equalities = tuple(zip(schema.primary_columns(), keys, strict=True))
-                alias = _add_join(state, schema.table, _domain_stem(d), equalities)
+                alias = _add_join(ctx, state, schema.table, equalities)
                 state.hoisted[d] = (alias, domain)
                 return alias, domain
         case expr.DomainField(head, label):
@@ -145,7 +141,7 @@ def compile_domain(ctx: SqlContext, state: CompileState, d: expr.Domain) -> tupl
                 equalities = tuple(
                     (there, sql.Col(head_alias, here)) for here, there in foreign.columns
                 )
-                alias = _add_join(state, table, _domain_stem(d), equalities)
+                alias = _add_join(ctx, state, table, equalities)
                 state.hoisted[d] = (alias, foreign.domain)
                 return alias, foreign.domain
     assert_never(d)
@@ -233,30 +229,52 @@ def compile_expr(ctx: SqlContext, state: CompileState, e: expr.Expr) -> sql.Expr
     assert_never(e)
 
 
-def compile_query(database: Database, q: Query) -> sql.Query:
-    """Compile a type-checked query to a SQL query. The order keys compile with each
-    output alias bound to a bare-name reference, which SQLite resolves in ORDER BY."""
-    for binding in q.variables:
-        if binding.domain not in database.domains:
+def _bind_variable(
+    ctx: SqlContext, state: CompileState, database: Database, binding: Binding
+) -> tuple[str, str]:
+    """The table of a domain binding under a fresh alias, which is recorded as the
+    variable's."""
+    match database.domains.get(binding.domain):
+        case None:
             raise MathQLError(f"unknown domain {binding.domain}")
-    froms = tuple((database.domains[b.domain].table, b.var) for b in q.variables)
+        case schema:
+            alias = _fresh_safe_alias(ctx, state)
+            state.var_alias[binding.var] = alias
+            return schema.table, alias
+
+
+def compile_query(
+    database: Database, is_safe_alias: Callable[[str], bool], q: Query
+) -> sql.Query:
+    """Compile a type-checked query to a SQL query, with `is_safe_alias` deciding which
+    names may serve as aliases."""
     idents: dict[str, ContextEntry] = {
         **{c.name: ConstEntry(c.sql) for c in database.constants},
         **{b.var: DomainEntry(b.domain) for b in q.variables},
     }
     functions = {f.name: f.sql_name for f in database.sql_functions}
-    ctx = SqlContext(idents=idents, schemas=database.domains, functions=functions)
-    aliased = SqlContext(
-        idents={**idents, **{o.name: ConstEntry(sql.Ref(o.name)) for o in q.output}},
+    ctx = SqlContext(
+        idents=idents,
         schemas=database.domains,
         functions=functions,
+        is_safe_alias=is_safe_alias,
     )
-    state = CompileState(taken=[b.var for b in q.variables], joins=[], hoisted={})
-    output = tuple((compile_expr(ctx, state, o.expr), o.name) for o in q.output)
+    state = CompileState(next_alias=1, var_alias={}, joins=[], hoisted={})
+    froms = tuple(_bind_variable(ctx, state, database, b) for b in q.variables)
+    columns = tuple(
+        (o.name, _fresh_safe_alias(ctx, state), compile_expr(ctx, state, o.expr))
+        for o in q.output
+    )
+    output = tuple((e, alias) for _, alias, e in columns)
+    aliased = SqlContext(
+        idents={**idents, **{name: ConstEntry(sql.Ref(a)) for name, a, _ in columns}},
+        schemas=database.domains,
+        functions=functions,
+        is_safe_alias=is_safe_alias,
+    )
     cond = compile_expr(ctx, state, q.condition)
-    order = tuple(
-        (compile_expr(aliased, state, entry.key), entry.direction) for entry in q.order
-    )
+    keys = ((compile_expr(aliased, state, entry.key), entry.direction) for entry in q.order)
+    order = tuple((e, direction) for e, direction in keys if not sql.is_constant(e))
     return sql.Query(
         froms=froms,
         joins=tuple(state.joins),

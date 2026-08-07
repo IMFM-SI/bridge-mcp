@@ -2,31 +2,15 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
-import sqlite3
 from importlib import resources
-from pathlib import Path
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.mathql.database import Database
-from bridge_mcp.mathql.databases import math_data, sym_ob_small
+from bridge_mcp.databases import DATABASES, Open
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.execute import database_path, run_query
-
-
-def _available() -> dict[str, tuple[Database, Path]]:
-    """The databases whose files are present, keyed by name."""
-    candidates = (
-        ("math_data", math_data.database, database_path()),
-        ("sym_ob_small", sym_ob_small.database, sym_ob_small.database_path()),
-    )
-    return {name: (database, path) for name, database, path in candidates if path.exists()}
-
-
-DATABASES = _available()
+from bridge_mcp.mathql.execute import run_query
 
 _SUMMARY = """## Writing queries
 Expressions use fields (g.num_vertices), id(x) for an object's primary key, literals,
@@ -65,8 +49,8 @@ def _build_instructions() -> str:
         f"parameter selecting one (default: {default}).",
         "",
     ]
-    for name, (selected, _) in DATABASES.items():
-        lines += _database_section(name, selected.describe()) + [""]
+    for name, opened in DATABASES.items():
+        lines += _database_section(name, opened.database.describe()) + [""]
     lines.append(_SUMMARY)
     return "\n".join(lines)
 
@@ -79,7 +63,7 @@ def register(mcp: FastMCP) -> None:
 
     default = next(iter(DATABASES), None)
 
-    def resolve(database: str | None) -> tuple[Database, Path]:
+    def resolve(database: str | None) -> Open:
         name = database if database is not None else default
         if name is not None and name in DATABASES:
             return DATABASES[name]
@@ -108,7 +92,7 @@ def register(mcp: FastMCP) -> None:
         postprocess: [column name, expression] pairs (optional).
         database: which database to query (optional; the default is the first).
         """
-        selected, path = resolve(database)
+        opened = resolve(database)
         request: dict[str, Any] = {"domains": domains, "output": output}
         if condition is not None:
             request["condition"] = condition
@@ -119,10 +103,7 @@ def register(mcp: FastMCP) -> None:
         if postprocess is not None:
             request["postprocess"] = postprocess
         try:
-            with contextlib.closing(
-                sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-            ) as connection:
-                return run_query(connection, selected, request)
+            return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
         except MathQLError as error:
             raise ValueError(str(error)) from error
 
@@ -135,13 +116,12 @@ def register(mcp: FastMCP) -> None:
         if database is None:
             return {
                 "databases": [
-                    {"name": name, "overview": selected.overview}
-                    for name, (selected, _) in DATABASES.items()
+                    {"name": name, "overview": opened.database.overview}
+                    for name, opened in DATABASES.items()
                 ]
             }
         else:
-            selected, _ = resolve(database)
-            return selected.describe()
+            return resolve(database).database.describe()
 
     @mcp.tool()
     def grammar() -> str:

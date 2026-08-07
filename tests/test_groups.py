@@ -13,11 +13,16 @@ from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
+    return sql.render_query(
+        compile_query(
+            database, safe_alias(database), check_query(database, from_json(request))
+        )
+    )
 
 
 def test_composite_key_object() -> None:
@@ -27,9 +32,7 @@ def test_composite_key_object() -> None:
             "output": [["name", "Group[24, 12].structure_description"]],
         }
     )
-    assert (
-        'LEFT JOIN "small_group" AS "Group" ON "Group"."order" = 24 AND "Group"."index" = 12'
-    ) in rendered
+    assert 'LEFT JOIN "small_group" AS c3 ON c3."order" = 24 AND c3."index" = 12' in rendered
 
 
 def test_keyword_columns_are_quoted() -> None:
@@ -40,8 +43,8 @@ def test_keyword_columns_are_quoted() -> None:
             "order": [["g.order", "desc"]],
         }
     )
-    assert '"g"."order" AS "n"' in rendered
-    assert 'ORDER BY "g"."order" DESC' in rendered
+    assert 'c1."order" AS c2' in rendered
+    assert 'ORDER BY c1."order" DESC' in rendered
 
 
 def test_describe_includes_group_domain() -> None:

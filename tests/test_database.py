@@ -7,10 +7,15 @@ from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
+
+_safe_alias = safe_alias(database)
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
+    return sql.render_query(
+        compile_query(database, _safe_alias, check_query(database, from_json(request)))
+    )
 
 
 def test_render_simple() -> None:
@@ -22,7 +27,7 @@ def test_render_simple() -> None:
         }
     )
     assert rendered == (
-        'SELECT "g"."graph6" AS "graph6" FROM "graph" AS "g" WHERE ("g"."num_vertices" = 5)'
+        'SELECT c1."graph6" AS c2 FROM "graph" AS c1 WHERE (c1."num_vertices" = 5)'
     )
 
 
@@ -37,7 +42,7 @@ def test_render_order_and_limit() -> None:
         }
     )
     assert rendered.endswith(
-        'WHERE ("g"."num_vertices" = 5) ORDER BY "g"."num_edges" DESC LIMIT 3'
+        'WHERE (c1."num_vertices" = 5) ORDER BY c1."num_edges" DESC LIMIT 3'
     )
 
 
@@ -49,12 +54,12 @@ def test_render_list_literal() -> None:
             "condition": "g.degree_sequence == [2, 2, 2]",
         }
     )
-    assert '(json("g"."degree_sequence") = json(json_array(2, 2, 2)))' in rendered
+    assert '(json(c1."degree_sequence") = json(json_array(2, 2, 2)))' in rendered
 
 
 def test_id_is_graph6() -> None:
     rendered = _rendered({"domains": [["g", "Graph"]], "output": [["gid", "id(g)"]]})
-    assert rendered == 'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
+    assert rendered == 'SELECT c1."graph6" AS c2 FROM "graph" AS c1 WHERE 1'
 
 
 def test_describe() -> None:

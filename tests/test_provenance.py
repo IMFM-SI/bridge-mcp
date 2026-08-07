@@ -13,16 +13,18 @@ from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
+    q = check_query(database, from_json(request))
+    return sql.render_query(compile_query(database, safe_alias(database), q))
 
 
 def test_provenance_composite_key() -> None:
     rendered = _rendered({"domains": [["p", "Provenance"]], "output": [["key", "id(p)"]]})
-    assert ('json_array("p"."domain", "p"."field", "p"."source") AS "key"') in rendered
+    assert ('json_array(c1."domain", c1."field", c1."source") AS c2') in rendered
 
 
 def test_provenance_source_join() -> None:
@@ -33,7 +35,7 @@ def test_provenance_source_join() -> None:
             "condition": "p.domain == 'Trait'",
         }
     )
-    assert 'LEFT JOIN "source" AS "p_source" ON "p_source"."id" = "p"."source"' in rendered
+    assert 'LEFT JOIN "source" AS c3 ON c3."id" = c1."source"' in rendered
 
 
 def test_graph_source_join() -> None:
@@ -44,7 +46,7 @@ def test_graph_source_join() -> None:
             "condition": "g.graph6 == 'Bw'",
         }
     )
-    assert 'LEFT JOIN "source" AS "g_source" ON "g_source"."id" = "g"."source"' in rendered
+    assert 'LEFT JOIN "source" AS c3 ON c3."id" = c1."source"' in rendered
 
 
 def test_describe_includes_provenance_domains() -> None:

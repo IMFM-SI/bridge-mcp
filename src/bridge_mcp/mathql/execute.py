@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -278,17 +278,43 @@ def _row(
     return output + eval_postprocess(PostEnvironment(dict(output), functions), q.postprocess)
 
 
+def _column_names(connection: sqlite3.Connection, table: str) -> list[str]:
+    """The names of the columns of `table`."""
+    statement = "SELECT name FROM pragma_table_info(?)"
+    return [row[0] for row in connection.execute(statement, (table,)).fetchall()]
+
+
+def safe_alias_predicate(
+    connection: sqlite3.Connection, database: Database
+) -> Callable[[str], bool]:
+    """A name is a safe alias when no table of `database` has a column of that name.
+    `rowid`, `oid` and `_rowid_` name a column that `pragma_table_info` omits."""
+    columns = (
+        name
+        for schema in database.domains.values()
+        for name in _column_names(connection, schema.table)
+    )
+    taken = {name.lower() for name in columns} | {"rowid", "oid", "_rowid_"}
+    return lambda name: name.lower() not in taken
+
+
 def run(
-    connection: sqlite3.Connection, database: Database, q: query.Query
+    connection: sqlite3.Connection,
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    q: query.Query,
 ) -> list[list[tuple[str, object]]]:
     """Run a type-checked query, returning each row as its list of name/value pairs."""
-    rendered = sql.render_query(compile_query(database, q))
+    rendered = sql.render_query(compile_query(database, is_safe_alias, q))
     functions = {f.name: f for f in database.post_functions}
     return [_row(q, functions, row) for row in connection.execute(rendered).fetchall()]
 
 
 def run_query(
-    connection: sqlite3.Connection, database: Database, request: Mapping[str, Any]
+    connection: sqlite3.Connection,
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    request: Mapping[str, Any],
 ) -> list[list[tuple[str, object]]]:
     """Parse, type-check, compile, and run a query from its JSON form."""
-    return run(connection, database, check_query(database, from_json(request)))
+    return run(connection, database, is_safe_alias, check_query(database, from_json(request)))

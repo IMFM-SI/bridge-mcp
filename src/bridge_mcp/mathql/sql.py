@@ -133,6 +133,26 @@ def json_array(items: tuple[Expr, ...]) -> Expr:
             return JsonArray(items)
 
 
+def is_constant(e: Expr) -> bool:
+    """Does the expression take the same value in every row?"""
+    match e:
+        case IntLit() | StrLit() | BoolLit() | Null():
+            return True
+        case Col() | Ref() | Call():
+            return False
+        case UnOp(_, operand) | IsNull(operand) | IsNotNull(operand) | Json(operand):
+            return is_constant(operand)
+        case JsonExtract(operand, _):
+            return is_constant(operand)
+        case BinOp(_, left, right) | Compare(_, left, right):
+            return is_constant(left) and is_constant(right)
+        case Case(cond, then_, else_):
+            return is_constant(cond) and is_constant(then_) and is_constant(else_)
+        case JsonArray(items):
+            return all(is_constant(item) for item in items)
+    assert_never(e)
+
+
 def render_unary_op(op: UnaryOp) -> str:
     match op:
         case UnaryOp.NOT:
@@ -195,9 +215,9 @@ def render(e: Expr) -> str:
     """
     match e:
         case Col(table, column):
-            return f"{render_ident(table)}.{render_ident(column)}"
+            return f"{table}.{render_ident(column)}"
         case Ref(name):
-            return render_ident(name)
+            return name
         case IntLit(value):
             return str(value)
         case BoolLit(value):
@@ -255,11 +275,10 @@ class Query:
 
 def _render_join(join: Join) -> str:
     conditions = [
-        f"{render_ident(join.alias)}.{render_ident(column)} = {render(e)}"
-        for column, e in join.equalities
+        f"{join.alias}.{render_ident(column)} = {render(e)}" for column, e in join.equalities
     ]
     on = " AND ".join(conditions) if conditions else "1"
-    return f" LEFT JOIN {render_ident(join.table)} AS {render_ident(join.alias)} ON {on}"
+    return f" LEFT JOIN {render_ident(join.table)} AS {join.alias} ON {on}"
 
 
 def _render_from(q: Query) -> str:
@@ -267,7 +286,7 @@ def _render_from(q: Query) -> str:
     table, and `(SELECT 1)` where a hoisted join stands over no table."""
     if q.froms:
         return " FROM " + ", ".join(
-            f"{render_ident(table)} AS {render_ident(alias)}" for table, alias in q.froms
+            f"{render_ident(table)} AS {alias}" for table, alias in q.froms
         )
     elif q.joins:
         return " FROM (SELECT 1)"
@@ -281,9 +300,7 @@ def render_query(q: Query) -> str:
     matches no row its columns are NULL. A query naming no output column selects `1`."""
     joins = "".join(_render_join(join) for join in q.joins)
     columns = (
-        ", ".join(f"{render(e)} AS {render_ident(alias)}" for e, alias in q.output)
-        if q.output
-        else "1"
+        ", ".join(f"{render(e)} AS {alias}" for e, alias in q.output) if q.output else "1"
     )
     order = (
         " ORDER BY " + ", ".join(f"{render(e)} {render_direction(d)}" for e, d in q.order)

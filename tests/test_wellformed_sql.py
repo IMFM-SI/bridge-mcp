@@ -1,6 +1,7 @@
 """Every rendering the compiler emits parses, checked with EXPLAIN."""
 
 import sqlite3
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -9,7 +10,7 @@ from bridge_mcp.mathql import sql
 from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.databases import math_data, sym_ob_small
-from bridge_mcp.mathql.execute import database_path
+from bridge_mcp.mathql.execute import database_path, safe_alias_predicate
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
 
@@ -21,7 +22,25 @@ SHAPES: list[dict[str, Any]] = [
     {"domains": [], "output": [["n", "Graph['Bw'].num_vertices"]]},
     {"domains": [], "output": [["k", "id(Graph['Bw'])"]]},
     {"domains": [["g", "Graph"]], "output": []},
+    {
+        "domains": [["g", "Graph"]],
+        "output": [],
+        "order": [["g.num_vertices", "asc"]],
+        "limit": 1,
+    },
+    {
+        "domains": [["g", "Graph"]],
+        "output": [["n", "g.num_vertices"]],
+        "order": [["1", "asc"], ["g.num_edges", "desc"]],
+        "limit": 1,
+    },
     {"domains": [["g", "Graph"]], "output": [], "order": [["1", "asc"]], "limit": 1},
+    {
+        "domains": [["g", "Graph"]],
+        "output": [["k", "id(g.automorphism_group)"]],
+        "order": [["g.automorphism_group.order", "desc"]],
+        "limit": 1,
+    },
     {"domains": [["g", "Graph"]], "output": [["n", "g.num_vertices"]], "limit": 0},
     {
         "domains": [["g", "Graph"], ["h", "Graph"]],
@@ -33,9 +52,14 @@ SHAPES: list[dict[str, Any]] = [
 ]
 
 
-def _explained(connection: sqlite3.Connection, database: Database, request: Any) -> None:
+def _explained(
+    connection: sqlite3.Connection,
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    request: Any,
+) -> None:
     rendered = sql.render_query(
-        compile_query(database, check_query(database, from_json(request)))
+        compile_query(database, is_safe_alias, check_query(database, from_json(request)))
     )
     connection.execute(f"EXPLAIN {rendered}")
 
@@ -48,14 +72,23 @@ def connection() -> sqlite3.Connection:
     return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
 
 
-def test_degenerate_shapes_parse(connection: sqlite3.Connection) -> None:
+@pytest.fixture
+def is_safe_alias(connection: sqlite3.Connection) -> Callable[[str], bool]:
+    return safe_alias_predicate(connection, math_data.database)
+
+
+def test_degenerate_shapes_parse(
+    connection: sqlite3.Connection, is_safe_alias: Callable[[str], bool]
+) -> None:
     for request in SHAPES:
-        _explained(connection, math_data.database, request)
+        _explained(connection, math_data.database, is_safe_alias, request)
 
 
-def test_every_published_example_parses(connection: sqlite3.Connection) -> None:
+def test_every_published_example_parses(
+    connection: sqlite3.Connection, is_safe_alias: Callable[[str], bool]
+) -> None:
     for example in math_data.database.examples:
-        _explained(connection, math_data.database, example.query)
+        _explained(connection, math_data.database, is_safe_alias, example.query)
 
 
 def test_every_maniplex_example_parses() -> None:
@@ -63,6 +96,7 @@ def test_every_maniplex_example_parses() -> None:
     if not path.exists():
         pytest.skip(f"{path} not present")
     connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    is_safe_alias = safe_alias_predicate(connection, sym_ob_small.database)
     for example in sym_ob_small.database.examples:
-        _explained(connection, sym_ob_small.database, example.query)
+        _explained(connection, sym_ob_small.database, is_safe_alias, example.query)
     connection.close()

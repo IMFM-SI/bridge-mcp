@@ -1,6 +1,8 @@
 """Checks for compiling type-checked queries to SQL, over a toy database with a
 foreign key."""
 
+from collections.abc import Callable
+
 import pytest
 
 from bridge_mcp.mathql import sql
@@ -9,15 +11,22 @@ from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.query import Query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.toy import DATABASE as TOY
+
+_safe_alias = safe_alias(TOY)
 
 
 def _typed(request: dict[str, object]) -> Query:
     return check_query(TOY, from_json(request))
 
 
+def _rendered_by(is_safe_alias: Callable[[str], bool], request: dict[str, object]) -> str:
+    return sql.render_query(compile_query(TOY, is_safe_alias, _typed(request)))
+
+
 def _rendered(request: dict[str, object]) -> str:
-    return sql.render_query(compile_query(TOY, _typed(request)))
+    return _rendered_by(_safe_alias, request)
 
 
 def test_fields_and_condition() -> None:
@@ -25,13 +34,13 @@ def test_fields_and_condition() -> None:
         _rendered(
             {"domains": [["g", "Graph"]], "output": [["n", "g.n"]], "condition": "g.n > 3"}
         )
-        == 'SELECT "g"."n" AS "n" FROM "graph" AS "g" WHERE ("g"."n" > 3)'
+        == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE (c1."n" > 3)'
     )
 
 
 def test_id_of_single_column_key() -> None:
     assert _rendered({"domains": [["g", "Graph"]], "output": [["gid", "id(g)"]]}) == (
-        'SELECT "g"."graph6" AS "gid" FROM "graph" AS "g" WHERE 1'
+        'SELECT c1."graph6" AS c2 FROM "graph" AS c1 WHERE 1'
     )
 
 
@@ -44,9 +53,9 @@ def test_domain_field_hoists_one_join() -> None:
         }
     )
     assert rendered == (
-        'SELECT "m_skeleton"."graph6" AS "s" FROM "maniplex" AS "m"'
-        ' LEFT JOIN "graph" AS "m_skeleton" ON "m_skeleton"."graph6" = "m"."skeleton_graph6"'
-        ' WHERE ("m_skeleton"."n" > 3)'
+        'SELECT c3."graph6" AS c2 FROM "maniplex" AS c1'
+        ' LEFT JOIN "graph" AS c3 ON c3."graph6" = c1."skeleton_graph6"'
+        ' WHERE (c3."n" > 3)'
     )
 
 
@@ -59,9 +68,9 @@ def test_obj_hoists_a_join() -> None:
         }
     )
     assert rendered == (
-        'SELECT "Graph"."n" AS "n" FROM "graph" AS "g"'
-        ' LEFT JOIN "graph" AS "Graph" ON "Graph"."graph6" = \'abc\''
-        ' WHERE ("g"."n" = "Graph"."n")'
+        'SELECT c3."n" AS c2 FROM "graph" AS c1'
+        ' LEFT JOIN "graph" AS c3 ON c3."graph6" = \'abc\''
+        ' WHERE (c1."n" = c3."n")'
     )
 
 
@@ -73,7 +82,7 @@ def test_defined_on_domain_field() -> None:
             "condition": "defined id(m.skeleton)",
         }
     )
-    assert 'WHERE ("m_skeleton"."graph6" IS NOT NULL)' in rendered
+    assert 'WHERE (c3."graph6" IS NOT NULL)' in rendered
 
 
 def test_order_by_alias_renders_bare() -> None:
@@ -86,18 +95,30 @@ def test_order_by_alias_renders_bare() -> None:
         }
     )
     assert rendered == (
-        'SELECT ("g"."n" * "g"."n") AS "m" FROM "graph" AS "g" WHERE 1 ORDER BY "m" DESC LIMIT 3'
+        'SELECT (c1."n" * c1."n") AS c2 FROM "graph" AS c1 WHERE 1 ORDER BY c2 DESC LIMIT 3'
     )
 
 
-def test_fresh_alias_avoids_variables() -> None:
+def test_a_rejected_candidate_alias_is_skipped() -> None:
+    assert (
+        _rendered_by(
+            lambda name: name != "c1",
+            {"domains": [["g", "Graph"]], "output": [["n", "g.n"]]},
+        )
+        == 'SELECT c2."n" AS c3 FROM "graph" AS c2 WHERE 1'
+    )
+
+
+def test_an_output_column_named_after_a_table_column_is_not_captured() -> None:
     rendered = _rendered(
         {
-            "domains": [["graph", "Graph"]],
-            "output": [["n", "Graph['abc'].n"]],
+            "domains": [["g", "Graph"]],
+            "output": [["graph6", "g.n"]],
+            "order": [["graph6 * 1", "asc"]],
         }
     )
-    assert 'LEFT JOIN "graph" AS "Graph2" ON "Graph2"."graph6" = \'abc\'' in rendered
+    assert rendered == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1 ORDER BY (c2 * 1) ASC'
+    assert "graph6" not in rendered
 
 
 def test_tuples_projections_and_conditional() -> None:
@@ -108,11 +129,11 @@ def test_tuples_projections_and_conditional() -> None:
             "condition": "if g.planar then g.n > 0 else [1, 2] == [g.n, g.n]",
         }
     )
-    assert 'json_array("g"."n", "g"."planar") AS "pair"' in rendered
-    assert 'json_extract(json_array("g"."n", "g"."planar"), \'$[0]\') AS "first"' in rendered
+    assert 'json_array(c1."n", c1."planar") AS c2' in rendered
+    assert 'json_extract(json_array(c1."n", c1."planar"), \'$[0]\') AS c3' in rendered
     assert (
-        'CASE WHEN "g"."planar" THEN ("g"."n" > 0)'
-        ' ELSE (json(json_array(1, 2)) = json(json_array("g"."n", "g"."n"))) END' in rendered
+        'CASE WHEN c1."planar" THEN (c1."n" > 0)'
+        ' ELSE (json(json_array(1, 2)) = json(json_array(c1."n", c1."n"))) END' in rendered
     )
 
 
@@ -129,7 +150,7 @@ def test_call_compiles_to_its_sql_name() -> None:
             "condition": "size(g.graph6) > 2",
         }
     )
-    assert rendered.endswith('WHERE ("length"("g"."graph6") > 2)')
+    assert rendered.endswith('WHERE ("length"(c1."graph6") > 2)')
 
 
 def test_call_nests_and_serves_as_an_output_column() -> None:
@@ -140,8 +161,8 @@ def test_call_nests_and_serves_as_an_output_column() -> None:
             "condition": "size(g.graph6) > size('ab')",
         }
     )
-    assert '"length"("g"."graph6") AS "k"' in rendered
-    assert '("length"("g"."graph6") > "length"(\'ab\'))' in rendered
+    assert '"length"(c1."graph6") AS c2' in rendered
+    assert '("length"(c1."graph6") > "length"(\'ab\'))' in rendered
 
 
 def test_a_call_is_legal_in_an_order_key() -> None:
@@ -152,7 +173,59 @@ def test_a_call_is_legal_in_an_order_key() -> None:
             "order": [["size(g.graph6)", "desc"]],
         }
     )
-    assert rendered.endswith('ORDER BY "length"("g"."graph6") DESC')
+    assert rendered.endswith('ORDER BY "length"(c1."graph6") DESC')
+
+
+def test_a_constant_order_key_is_dropped() -> None:
+    assert (
+        _rendered(
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["n", "g.n"]],
+                "order": [["1", "asc"]],
+            }
+        )
+        == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1'
+    )
+
+
+def test_a_constant_order_key_beside_a_varying_one_leaves_one_term() -> None:
+    assert (
+        _rendered(
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["n", "g.n"]],
+                "order": [["1", "asc"], ["g.n", "desc"]],
+            }
+        )
+        == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1 ORDER BY c1."n" DESC'
+    )
+
+
+def test_order_keys_constant_in_every_shape_are_all_dropped() -> None:
+    assert (
+        _rendered(
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["n", "g.n"]],
+                "order": [["-1", "asc"], ["!true", "desc"], ["1 + 0", "asc"]],
+            }
+        )
+        == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1'
+    )
+
+
+def test_an_order_key_calling_a_database_function_is_kept() -> None:
+    assert (
+        _rendered(
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["n", "g.n"]],
+                "order": [["size('ab')", "asc"]],
+            }
+        )
+        == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1 ORDER BY "length"(\'ab\') ASC'
+    )
 
 
 def test_postprocess_contributes_nothing_to_the_sql() -> None:
@@ -163,26 +236,27 @@ def test_postprocess_contributes_nothing_to_the_sql() -> None:
             "postprocess": [["k", "plus(n, 1)"]],
         }
     )
-    assert '"n"' in rendered
-    assert '"k"' not in rendered
+    assert rendered == 'SELECT c1."n" AS c2 FROM "graph" AS c1 WHERE 1'
+    assert "k" not in rendered
+    assert "plus" not in rendered
 
 
 def test_a_query_over_no_table_has_no_from_clause() -> None:
     assert _rendered({"domains": [], "output": [["x", "2 + 2"]]}) == (
-        'SELECT (2 + 2) AS "x" WHERE 1'
+        "SELECT (2 + 2) AS c1 WHERE 1"
     )
 
 
 def test_a_hoisted_join_over_no_table_takes_a_one_row_left_operand() -> None:
     assert _rendered({"domains": [], "output": [["n", "Graph['abc'].n"]]}) == (
-        'SELECT "Graph"."n" AS "n" FROM (SELECT 1)'
-        ' LEFT JOIN "graph" AS "Graph" ON "Graph"."graph6" = \'abc\' WHERE 1'
+        'SELECT c2."n" AS c1 FROM (SELECT 1)'
+        ' LEFT JOIN "graph" AS c2 ON c2."graph6" = \'abc\' WHERE 1'
     )
 
 
 def test_a_query_naming_no_column_selects_a_placeholder() -> None:
     assert (
         _rendered({"domains": [["g", "Graph"]], "output": [], "condition": "g.n > 3"})
-        == 'SELECT 1 FROM "graph" AS "g" WHERE ("g"."n" > 3)'
+        == 'SELECT 1 FROM "graph" AS c1 WHERE (c1."n" > 3)'
     )
     assert _rendered({"domains": [], "output": []}) == "SELECT 1 WHERE 1"

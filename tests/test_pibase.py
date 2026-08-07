@@ -13,18 +13,21 @@ from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.execute import database_path
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
+from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(compile_query(database, check_query(database, from_json(request))))
+    compiled = compile_query(
+        database, safe_alias(database), check_query(database, from_json(request))
+    )
+    return sql.render_query(compiled)
 
 
 def test_composite_key_id() -> None:
     rendered = _rendered({"domains": [["t", "Trait"]], "output": [["key", "id(t)"]]})
     assert rendered == (
-        'SELECT json_array("t"."space", "t"."property") AS "key"'
-        ' FROM "pibase_trait" AS "t" WHERE 1'
+        'SELECT json_array(c1."space", c1."property") AS c2 FROM "pibase_trait" AS c1 WHERE 1'
     )
 
 
@@ -36,8 +39,8 @@ def test_composite_key_object() -> None:
         }
     )
     assert (
-        'LEFT JOIN "pibase_trait" AS "Trait"'
-        ' ON "Trait"."space" = \'S000026\' AND "Trait"."property" = \'P000016\''
+        'LEFT JOIN "pibase_trait" AS c3'
+        " ON c3.\"space\" = 'S000026' AND c3.\"property\" = 'P000016'"
     ) in rendered
 
 
@@ -50,7 +53,7 @@ def test_id_tuple_comparison_canonicalized() -> None:
         }
     )
     assert (
-        'json(json_array("t"."space", "t"."property"))'
+        'json(json_array(c1."space", c1."property"))'
         " = json(json_array('S000149', 'P000053'))"
     ) in rendered
 
@@ -63,12 +66,8 @@ def test_foreign_keys_join() -> None:
             "condition": "t.value",
         }
     )
-    assert (
-        'LEFT JOIN "pibase_space" AS "t_space" ON "t_space"."uid" = "t"."space"'
-    ) in rendered
-    assert (
-        'LEFT JOIN "pibase_property" AS "t_property" ON "t_property"."uid" = "t"."property"'
-    ) in rendered
+    assert 'LEFT JOIN "pibase_space" AS c3 ON c3."uid" = c1."space"' in rendered
+    assert 'LEFT JOIN "pibase_property" AS c5 ON c5."uid" = c1."property"' in rendered
 
 
 def test_nullable_theorem_link() -> None:
@@ -79,7 +78,7 @@ def test_nullable_theorem_link() -> None:
             "condition": "defined id(t.theorem)",
         }
     )
-    assert 'WHERE ("t_theorem"."uid" IS NOT NULL)' in rendered
+    assert 'WHERE (c3."uid" IS NOT NULL)' in rendered
 
 
 def test_describe_includes_pibase_domains() -> None:
