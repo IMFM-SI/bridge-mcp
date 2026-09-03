@@ -279,19 +279,28 @@ def _row(
 
 
 def _column_names(connection: sqlite3.Connection, table: str) -> list[str]:
-    """The names of the columns of `table`."""
-    statement = "SELECT name FROM pragma_table_info(?)"
-    return [row[0] for row in connection.execute(statement, (table,)).fetchall()]
+    """The names of the columns of `table`, read with a query so that a connection
+    restricted to queries can answer it."""
+    cursor = connection.execute(f"SELECT * FROM {sql.render_ident(table)} LIMIT 0")
+    return [description[0] for description in cursor.description or []]
+
+
+def _tables(connection: sqlite3.Connection) -> set[str]:
+    """The names of the tables the database holds."""
+    statement = "SELECT name FROM sqlite_master WHERE type = 'table'"
+    return {row[0] for row in connection.execute(statement).fetchall()}
 
 
 def safe_alias_predicate(
     connection: sqlite3.Connection, database: Database
 ) -> Callable[[str], bool]:
     """A name is a safe alias when no table of `database` has a column of that name.
-    `rowid`, `oid` and `_rowid_` name a column that `pragma_table_info` omits."""
+    `rowid`, `oid` and `_rowid_` name a column that `SELECT *` omits."""
+    present = _tables(connection)
     columns = (
         name
         for schema in database.domains.values()
+        if schema.table in present
         for name in _column_names(connection, schema.table)
     )
     taken = {name.lower() for name in columns} | {"rowid", "oid", "_rowid_"}

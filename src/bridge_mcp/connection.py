@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from pathlib import Path
 
@@ -26,8 +27,14 @@ def _authorize(
 
 
 def open_read_only(path: Path) -> sqlite3.Connection:
-    """Open `path` so that SQLite refuses every write to it."""
-    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    """Open `path` on a connection that cannot write it, hold an attached database,
+    or load an extension. `NotSupportedError` from `enable_load_extension` says this
+    SQLite was built without extension loading."""
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    connection.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 0)
+    with contextlib.suppress(sqlite3.NotSupportedError):
+        connection.enable_load_extension(False)
+    return connection
 
 
 def restrict_to_queries(connection: sqlite3.Connection) -> None:

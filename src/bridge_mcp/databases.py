@@ -23,11 +23,10 @@ class Open:
 
 
 def _open(database: Database, path: Path) -> Open:
-    """Open `path` for `database`: read the column names, then admit only queries."""
+    """Open `path` for `database`, admitting queries alone from the first statement."""
     connection = open_read_only(path)
-    is_safe_alias = safe_alias_predicate(connection, database)
     restrict_to_queries(connection)
-    return Open(database, connection, is_safe_alias)
+    return Open(database, connection, safe_alias_predicate(connection, database))
 
 
 def _available() -> dict[str, Open]:
@@ -42,3 +41,12 @@ def _available() -> dict[str, Open]:
 
 
 DATABASES = _available()
+
+
+def resolve(name: str | None) -> Open:
+    """The database `name` names, or the first one when `name` is `None`."""
+    chosen = name if name is not None else next(iter(DATABASES), None)
+    if chosen is not None and chosen in DATABASES:
+        return DATABASES[chosen]
+    else:
+        raise ValueError(f"unknown database '{chosen}'; available: {', '.join(DATABASES)}")

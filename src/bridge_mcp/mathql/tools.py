@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.databases import DATABASES, Open
+from bridge_mcp.databases import DATABASES, resolve
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import run_query
 
@@ -60,15 +60,6 @@ INSTRUCTIONS = _build_instructions()
 
 def register(mcp: FastMCP) -> None:
     """Register the query tools on `mcp`."""
-
-    default = next(iter(DATABASES), None)
-
-    def resolve(database: str | None) -> Open:
-        name = database if database is not None else default
-        if name is not None and name in DATABASES:
-            return DATABASES[name]
-        else:
-            raise ValueError(f"unknown database '{name}'; available: {', '.join(DATABASES)}")
 
     @mcp.tool()
     def query(

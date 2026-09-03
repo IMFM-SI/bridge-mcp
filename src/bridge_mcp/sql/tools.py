@@ -7,7 +7,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from bridge_mcp.databases import DATABASES, Open
+from bridge_mcp.databases import resolve
 
 INSTRUCTIONS = """## Running SQL directly
 `sql` runs one SELECT statement against a database and returns the rows. The connection is
@@ -20,17 +20,14 @@ Examples:
   returns rows of the graph table."""
 
 
+def _cell(value: Any) -> Any:
+    """A cell as JSON carries it: a blob as its hexadecimal text, anything else as
+    it stands."""
+    return value.hex() if isinstance(value, bytes) else value
+
+
 def register(mcp: FastMCP) -> None:
     """Register the `sql` tool on `mcp`."""
-
-    default = next(iter(DATABASES), None)
-
-    def resolve(database: str | None) -> Open:
-        name = database if database is not None else default
-        if name is not None and name in DATABASES:
-            return DATABASES[name]
-        else:
-            raise ValueError(f"unknown database '{name}'; available: {', '.join(DATABASES)}")
 
     @mcp.tool()
     def sql(statement: str, database: str | None = None) -> list[list[tuple[str, Any]]]:
@@ -54,6 +51,8 @@ def register(mcp: FastMCP) -> None:
         try:
             cursor = connection.execute(statement)
             names = [description[0] for description in cursor.description or []]
-            return [list(zip(names, row, strict=True)) for row in cursor.fetchall()]
+            return [
+                list(zip(names, map(_cell, row), strict=True)) for row in cursor.fetchall()
+            ]
         except sqlite3.Error as error:
             raise ValueError(str(error)) from error

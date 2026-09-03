@@ -33,6 +33,15 @@ REFUSED = (
     "SELECT name FROM pragma_table_info('graph')",
 )
 
+WRITES = (
+    "INSERT INTO graph VALUES ('B?', 3)",
+    "UPDATE graph SET num_vertices = 0",
+    "DELETE FROM graph",
+    "DROP TABLE graph",
+    "CREATE TABLE other (x)",
+    "ALTER TABLE graph ADD COLUMN extra INTEGER",
+)
+
 
 def test_a_query_runs(path: Path) -> None:
     connection = open_read_only(path)
@@ -79,4 +88,34 @@ def test_the_alias_predicate_rejects_the_real_column_names(path: Path) -> None:
     assert not is_safe_alias("graph6")
     assert not is_safe_alias("NUM_VERTICES")
     assert not is_safe_alias("rowid")
+    assert is_safe_alias("c1")
+
+
+@pytest.mark.parametrize("statement", WRITES)
+def test_the_open_mode_alone_refuses_a_write(path: Path, statement: str) -> None:
+    connection = open_read_only(path)
+    with pytest.raises(sqlite3.DatabaseError, match="readonly"):
+        connection.execute(statement)
+
+
+def test_the_attached_limit_alone_refuses_attach(path: Path) -> None:
+    other = path.parent / "other.db"
+    connection = open_read_only(path)
+    with pytest.raises(sqlite3.DatabaseError):
+        connection.execute(f"ATTACH DATABASE '{other}' AS a")
+    assert not other.exists()
+
+
+def test_an_extension_does_not_load(path: Path) -> None:
+    connection = open_read_only(path)
+    restrict_to_queries(connection)
+    with pytest.raises(sqlite3.DatabaseError):
+        connection.execute("SELECT load_extension('nonesuch')")
+
+
+def test_the_alias_predicate_runs_on_a_restricted_connection(path: Path) -> None:
+    connection = open_read_only(path)
+    restrict_to_queries(connection)
+    is_safe_alias = safe_alias_predicate(connection, database)
+    assert not is_safe_alias("num_vertices")
     assert is_safe_alias("c1")
