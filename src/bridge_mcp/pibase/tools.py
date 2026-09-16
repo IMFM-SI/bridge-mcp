@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import json
-import sqlite3
 
 from mcp.server.mcpserver import MCPServer
 from rapidfuzz import fuzz, process, utils
 
-from bridge_mcp.connection import open_read_only, restrict_to_queries
-from bridge_mcp.mathql.execute import database_path
+from bridge_mcp.databases import resolve
 
 INSTRUCTIONS = """## Search and derivation
 π-Base records traits. A trait is a space, a property, and a boolean value recording
@@ -38,26 +35,20 @@ Entry = tuple[str, object, str, str]
 """A searchable entry: kind, uid, display name, searched text."""
 
 
-def _connect() -> sqlite3.Connection:
-    connection = open_read_only(database_path())
-    restrict_to_queries(connection)
-    return connection
-
-
 @functools.cache
 def _catalog() -> tuple[Entry, ...]:
     """Every searchable string: spaces and properties under each of their names,
     theorems under their statements, groups under their structure descriptions."""
-    with contextlib.closing(_connect()) as connection:
-        named = [
-            (kind, row)
-            for kind, table in (("space", "pibase_space"), ("property", "pibase_property"))
-            for row in connection.execute(f"SELECT uid, name, aliases FROM {table}")
-        ]
-        theorems = connection.execute("SELECT uid, statement FROM pibase_theorem").fetchall()
-        groups = connection.execute(
-            'SELECT "order", "index", structure_description FROM small_group'
-        ).fetchall()
+    connection = resolve("math_data").connection
+    named = [
+        (kind, row)
+        for kind, table in (("space", "pibase_space"), ("property", "pibase_property"))
+        for row in connection.execute(f"SELECT uid, name, aliases FROM {table}")
+    ]
+    theorems = connection.execute("SELECT uid, statement FROM pibase_theorem").fetchall()
+    groups = connection.execute(
+        'SELECT "order", "index", structure_description FROM small_group'
+    ).fetchall()
     return tuple(
         [
             (kind, uid, name, text)
@@ -125,39 +116,39 @@ def derivation(space: str, property: str) -> dict[str, object]:
     space: a space uid, "S000149"; `search` returns them.
     property: a property uid, "P000053".
     """
-    with contextlib.closing(_connect()) as connection:
-        names = dict(connection.execute("SELECT uid, name FROM pibase_property"))
-        statements = dict(connection.execute("SELECT uid, statement FROM pibase_theorem"))
-        named = connection.execute(
-            "SELECT name FROM pibase_space WHERE uid = ?", (space,)
+    connection = resolve("math_data").connection
+    names = dict(connection.execute("SELECT uid, name FROM pibase_property"))
+    statements = dict(connection.execute("SELECT uid, statement FROM pibase_theorem"))
+    named = connection.execute(
+        "SELECT name FROM pibase_space WHERE uid = ?", (space,)
+    ).fetchone()
+    if named is None:
+        raise ValueError(f"unknown space '{space}'")
+
+    def node(prop: str) -> dict[str, object]:
+        row = connection.execute(
+            "SELECT value, asserted, theorem, premises FROM pibase_trait"
+            " WHERE space = ? AND property = ?",
+            (space, prop),
         ).fetchone()
-        if named is None:
-            raise ValueError(f"unknown space '{space}'")
-
-        def node(prop: str) -> dict[str, object]:
-            row = connection.execute(
-                "SELECT value, asserted, theorem, premises FROM pibase_trait"
-                " WHERE space = ? AND property = ?",
-                (space, prop),
-            ).fetchone()
-            if row is None:
-                raise ValueError(f"no known trait for {space} and {prop}")
-            value, asserted, theorem, premises = row
-            base: dict[str, object] = {
-                "property": names[prop],
-                "uid": prop,
-                "value": bool(value),
+        if row is None:
+            raise ValueError(f"no known trait for {space} and {prop}")
+        value, asserted, theorem, premises = row
+        base: dict[str, object] = {
+            "property": names[prop],
+            "uid": prop,
+            "value": bool(value),
+        }
+        if asserted:
+            return base | {"asserted": True}
+        else:
+            return base | {
+                "theorem": theorem,
+                "statement": statements[theorem],
+                "premises": [node(premise) for premise, _ in json.loads(premises)],
             }
-            if asserted:
-                return base | {"asserted": True}
-            else:
-                return base | {
-                    "theorem": theorem,
-                    "statement": statements[theorem],
-                    "premises": [node(premise) for premise, _ in json.loads(premises)],
-                }
 
-        return {"space": named[0], "uid": space, "trait": node(property)}
+    return {"space": named[0], "uid": space, "trait": node(property)}
 
 
 def register(mcp: MCPServer) -> None:
