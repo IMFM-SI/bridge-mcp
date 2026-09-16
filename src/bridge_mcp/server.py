@@ -1,4 +1,4 @@
-"""The bridge-mcp server: assemble the chosen components into one FastMCP app and run it."""
+"""The bridge-mcp server: assemble the chosen components into one MCPServer and run it."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import argparse
 import sys
 from types import ModuleType
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.graph import tools as graph_component
 from bridge_mcp.instructions import build_instructions
@@ -25,9 +25,9 @@ DEFAULT = ("mathql", "pibase", "networkx")
 """The components a server runs when the command line names none."""
 
 
-def build(names: tuple[str, ...] = DEFAULT) -> FastMCP:
+def build(names: tuple[str, ...] = DEFAULT) -> MCPServer:
     chosen = [COMPONENTS[name] for name in names]
-    mcp = FastMCP(
+    mcp = MCPServer(
         "bridge-mcp", instructions=build_instructions(c.INSTRUCTIONS for c in chosen)
     )
     for component in chosen:

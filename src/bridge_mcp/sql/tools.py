@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.databases import resolve
 
@@ -26,7 +26,7 @@ def _cell(value: Any) -> Any:
     return value.hex() if isinstance(value, bytes) else value
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     """Register the `sql` tool on `mcp`."""
 
     @mcp.tool()

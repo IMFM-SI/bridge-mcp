@@ -20,7 +20,7 @@ Set up the local Python environment with the needed development tools:
 `pip install -e ".[dev]"` installs the project in editable mode together with its runtime
 and development dependencies, declared in `pyproject.toml`:
 
-- runtime: `mcp[cli]` (the Model Context Protocol SDK and its `mcp` command-line tool),
+- runtime: `mcp[cli]>=2,<3` (the Model Context Protocol SDK and its `mcp` command-line tool),
   `lark` (the query-language parser), and `networkx` (the graph tools and the database
   generator);
 - development: `pytest` (tests), `mypy` (type checking), and `ruff` (linting and

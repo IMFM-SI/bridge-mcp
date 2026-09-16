@@ -1,6 +1,7 @@
 """A read-only connection admits a query and nothing else."""
 
 import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,17 @@ def test_a_query_runs(path: Path) -> None:
     connection = open_read_only(path)
     restrict_to_queries(connection)
     assert connection.execute("SELECT num_vertices FROM graph").fetchall() == [(2,)]
+
+
+def test_a_query_runs_on_another_thread(path: Path) -> None:
+    connection = open_read_only(path)
+    restrict_to_queries(connection)
+    statement = "SELECT num_vertices FROM graph"
+    rows = []
+    thread = threading.Thread(target=lambda: rows.extend(connection.execute(statement)))
+    thread.start()
+    thread.join()
+    assert rows == [(2,)]
 
 
 def test_the_schema_is_readable(path: Path) -> None:

@@ -18,6 +18,6 @@ def test_instructions_compose_components() -> None:
 
 
 def test_describe_lists_available_databases() -> None:
-    _, listed = asyncio.run(mcp.call_tool("describe", {}))
+    listed = asyncio.run(mcp.call_tool("describe", {})).structured_content
     names = {entry["name"] for entry in listed["databases"]}
     assert "math_data" in names

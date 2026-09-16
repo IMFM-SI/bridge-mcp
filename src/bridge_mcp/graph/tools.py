@@ -6,7 +6,7 @@ from typing import Any
 
 import networkx
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.graph.invariants import all_invariants, minimal_coloring
 
@@ -370,7 +370,7 @@ TOOLS: list[Callable[..., Any]] = [
 ]
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     """Register the graph tools on `mcp`."""
     for tool in TOOLS:
         mcp.add_tool(tool)

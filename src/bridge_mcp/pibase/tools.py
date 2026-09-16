@@ -7,7 +7,7 @@ import functools
 import json
 import sqlite3
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from rapidfuzz import fuzz, process, utils
 
 from bridge_mcp.connection import open_read_only, restrict_to_queries
@@ -160,7 +160,7 @@ def derivation(space: str, property: str) -> dict[str, object]:
         return {"space": named[0], "uid": space, "trait": node(property)}
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     """Register the π-Base tools on `mcp`."""
     for tool in (search, derivation):
         mcp.add_tool(tool)

@@ -29,8 +29,12 @@ def _authorize(
 def open_read_only(path: Path) -> sqlite3.Connection:
     """Open `path` on a connection that cannot write it, hold an attached database,
     or load an extension. `NotSupportedError` from `enable_load_extension` says this
-    SQLite was built without extension loading."""
-    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    SQLite was built without extension loading.
+
+    The connection is used from whichever thread the MCP SDK runs a tool on, so
+    `check_same_thread` is off; SQLite serializes the access itself, and the read-only
+    mode, the attached-database limit and the authorizer belong to the connection."""
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
     connection.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 0)
     with contextlib.suppress(sqlite3.NotSupportedError):
         connection.enable_load_extension(False)

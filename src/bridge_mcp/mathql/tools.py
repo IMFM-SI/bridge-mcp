@@ -6,7 +6,7 @@ import json
 from importlib import resources
 from typing import Any, Literal
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.databases import DATABASES, resolve
 from bridge_mcp.mathql.errors import MathQLError
@@ -58,7 +58,7 @@ def _build_instructions() -> str:
 INSTRUCTIONS = _build_instructions()
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     """Register the query tools on `mcp`."""
 
     @mcp.tool()

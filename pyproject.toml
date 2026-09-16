@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-2-Clause"
 dependencies = [
-    "mcp[cli]",
+    "mcp[cli]>=2,<3",
     "lark",
     "networkx",
     "numpy",
