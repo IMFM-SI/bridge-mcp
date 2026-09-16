@@ -8,6 +8,7 @@ import networkx
 
 from mcp.server.mcpserver import MCPServer
 
+from bridge_mcp.failure import anticipating
 from bridge_mcp.graph.invariants import all_invariants, minimal_coloring
 
 INSTRUCTIONS = """## Graph tools
@@ -372,5 +373,6 @@ TOOLS: list[Callable[..., Any]] = [
 
 def register(mcp: MCPServer) -> None:
     """Register the graph tools on `mcp`."""
+    anticipate = anticipating(ValueError, networkx.NetworkXException)
     for tool in TOOLS:
-        mcp.add_tool(tool)
+        mcp.add_tool(anticipate(tool))

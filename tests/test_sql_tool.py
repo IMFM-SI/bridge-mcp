@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from bridge_mcp import databases
 from bridge_mcp.connection import open_read_only, restrict_to_queries
@@ -92,15 +93,15 @@ def test_the_tool_uses_the_connection_the_server_opened(app: MCPServer) -> None:
     ),
 )
 def test_a_statement_beyond_a_query_is_reported(app: MCPServer, statement: str) -> None:
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(ToolError):
         call(app, statement=statement)
 
 
 def test_a_malformed_statement_is_reported(app: MCPServer) -> None:
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(ToolError):
         call(app, statement="SELECT FROM")
 
 
 def test_an_unknown_database_is_reported(app: MCPServer) -> None:
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(ToolError):
         call(app, statement="SELECT 1", database="nosuch")

@@ -9,6 +9,7 @@ from typing import Any, Literal
 from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.databases import DATABASES, resolve
+from bridge_mcp.failure import anticipating
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import run_query
 
@@ -62,6 +63,7 @@ def register(mcp: MCPServer) -> None:
     """Register the query tools on `mcp`."""
 
     @mcp.tool()
+    @anticipating(MathQLError, ValueError)
     def query(
         domains: list[tuple[str, str]],
         output: list[tuple[str, str]],
@@ -98,12 +100,10 @@ def register(mcp: MCPServer) -> None:
             request["limit"] = limit
         if postprocess is not None:
             request["postprocess"] = postprocess
-        try:
-            return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
-        except MathQLError as error:
-            raise ValueError(str(error)) from error
+        return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
 
     @mcp.tool()
+    @anticipating(ValueError)
     def describe(database: str | None = None) -> dict[str, object]:
         """Describe a database: its domains, fields, constants, and examples.
 

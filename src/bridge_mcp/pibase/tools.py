@@ -9,6 +9,7 @@ from mcp.server.mcpserver import MCPServer
 from rapidfuzz import fuzz, process, utils
 
 from bridge_mcp.databases import resolve
+from bridge_mcp.failure import anticipating
 
 INSTRUCTIONS = """## Search and derivation
 π-Base records traits. A trait is a space, a property, and a boolean value recording
@@ -153,5 +154,6 @@ def derivation(space: str, property: str) -> dict[str, object]:
 
 def register(mcp: MCPServer) -> None:
     """Register the π-Base tools on `mcp`."""
+    anticipate = anticipating(ValueError)
     for tool in (search, derivation):
-        mcp.add_tool(tool)
+        mcp.add_tool(anticipate(tool))

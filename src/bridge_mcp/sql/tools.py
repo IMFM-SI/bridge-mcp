@@ -8,6 +8,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.databases import resolve
+from bridge_mcp.failure import anticipating
 
 INSTRUCTIONS = """## Running SQL directly
 `sql` runs one SELECT statement against a database and returns the rows. The connection is
@@ -30,6 +31,7 @@ def register(mcp: MCPServer) -> None:
     """Register the `sql` tool on `mcp`."""
 
     @mcp.tool()
+    @anticipating(sqlite3.Error, ValueError)
     def sql(statement: str, database: str | None = None) -> list[list[tuple[str, Any]]]:
         """Run one SQL SELECT statement and return the rows, each a list of
         [column name, value] pairs, the names taken from the statement's result columns.
@@ -47,12 +49,6 @@ def register(mcp: MCPServer) -> None:
         statement: the SELECT to run.
         database: which database to query (optional; the default is the first).
         """
-        connection = resolve(database).connection
-        try:
-            cursor = connection.execute(statement)
-            names = [description[0] for description in cursor.description or []]
-            return [
-                list(zip(names, map(_cell, row), strict=True)) for row in cursor.fetchall()
-            ]
-        except sqlite3.Error as error:
-            raise ValueError(str(error)) from error
+        cursor = resolve(database).connection.execute(statement)
+        names = [description[0] for description in cursor.description or []]
+        return [list(zip(names, map(_cell, row), strict=True)) for row in cursor.fetchall()]
