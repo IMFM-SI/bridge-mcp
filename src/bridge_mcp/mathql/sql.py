@@ -174,6 +174,8 @@ def render_binary_op(op: BinaryOp) -> str:
             return "-"
         case BinaryOp.MUL:
             return "*"
+        case BinaryOp.DIV:
+            return "/"
     assert_never(op)
 
 

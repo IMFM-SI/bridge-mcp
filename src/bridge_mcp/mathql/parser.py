@@ -58,6 +58,9 @@ class _ToAst(Transformer[Token, input_ast.Expr]):
     def mul(self, meta: Meta, left: input_ast.Expr, right: input_ast.Expr) -> input_ast.BinOp:
         return input_ast.BinOp(BinaryOp.MUL, left, right, _span(meta))
 
+    def div(self, meta: Meta, left: input_ast.Expr, right: input_ast.Expr) -> input_ast.BinOp:
+        return input_ast.BinOp(BinaryOp.DIV, left, right, _span(meta))
+
     def eq(self, meta: Meta, left: input_ast.Expr, right: input_ast.Expr) -> input_ast.Compare:
         return input_ast.Compare(ComparisonOp.EQ, left, right, _span(meta))
 

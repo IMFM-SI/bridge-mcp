@@ -256,3 +256,70 @@ def test_naming_no_column_keeps_one_row_per_match(
     )
     assert len(rows) == len(counted) == 4
     assert rows[0] == [("k", 2)]
+
+
+DIVISIONS = ((7, 2, 3), (-7, 2, -3), (7, -2, -3), (-7, -2, 3), (1, 2, 0), (0, 5, 0))
+
+
+@pytest.mark.parametrize(("left", "right", "quotient"), DIVISIONS)
+def test_division_truncates_toward_zero_in_both_stages(
+    connection: sqlite3.Connection,
+    is_safe_alias: Callable[[str], bool],
+    left: int,
+    right: int,
+    quotient: int,
+) -> None:
+    """The database and the postprocess evaluator compute the same quotient."""
+
+    def literal(n: int) -> str:
+        return f"({n})" if n < 0 else str(n)
+
+    rows = run_query(
+        connection,
+        database,
+        is_safe_alias,
+        {
+            "domains": [["g", "Graph"]],
+            "output": [
+                ["a", literal(left)],
+                ["b", literal(right)],
+                ["by_database", f"{literal(left)} / {literal(right)}"],
+            ],
+            "condition": "g.num_vertices == 1",
+            "postprocess": [["by_evaluator", "a / b"]],
+        },
+    )
+    assert dict(rows[0]) == {
+        "a": left,
+        "b": right,
+        "by_database": quotient,
+        "by_evaluator": quotient,
+    }
+
+
+def test_a_zero_divisor_has_no_value_in_either_stage(
+    connection: sqlite3.Connection, is_safe_alias: Callable[[str], bool]
+) -> None:
+    rows = run_query(
+        connection,
+        database,
+        is_safe_alias,
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["a", "7"], ["b", "0"], ["by_database", "7 / 0"]],
+            "condition": "g.num_vertices == 1",
+            "postprocess": [["by_evaluator", "a / b"]],
+        },
+    )
+    assert dict(rows[0]) == {"a": 7, "b": 0, "by_database": None, "by_evaluator": None}
+
+
+def test_a_zero_divisor_is_undefined_in_a_condition(
+    connection: sqlite3.Connection, is_safe_alias: Callable[[str], bool]
+) -> None:
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["g6", "id(g)"]],
+        "condition": "g.num_vertices == 3 && undefined (g.num_edges / (g.num_vertices - 3))",
+    }
+    assert len(run_query(connection, database, is_safe_alias, request)) == 4

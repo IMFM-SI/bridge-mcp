@@ -76,6 +76,6 @@ def binary_type(op: BinaryOp) -> tuple[Ty, Ty, Ty]:
     match op:
         case BinaryOp.AND | BinaryOp.OR:
             return (BoolType(), BoolType(), BoolType())
-        case BinaryOp.ADD | BinaryOp.SUB | BinaryOp.MUL:
+        case BinaryOp.ADD | BinaryOp.SUB | BinaryOp.MUL | BinaryOp.DIV:
             return (IntType(), IntType(), IntType())
     assert_never(op)

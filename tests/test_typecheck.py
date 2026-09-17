@@ -64,6 +64,7 @@ def test_ill_typed() -> None:
     assert not _elaborates([("n", "g.n")], "g.n")  # condition is int, not bool
     assert not _elaborates([("b", "g.bogus")], "g.planar")  # unknown field
     assert not _elaborates([("n", "g.n")], "g.planar + 1")  # bool in arithmetic
+    assert not _elaborates([("n", "g.n")], "g.n / g.planar")  # bool in arithmetic
 
 
 def test_outputs_are_independent() -> None:

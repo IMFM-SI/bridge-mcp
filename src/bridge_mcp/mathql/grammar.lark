@@ -25,6 +25,7 @@
          | mul_expr
 
 ?mul_expr: mul_expr "*" unary_expr -> mul
+         | mul_expr "/" unary_expr -> div
          | unary_expr
 
 ?unary_expr: "defined" unary_expr   -> defined

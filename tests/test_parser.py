@@ -67,11 +67,19 @@ def test_precedence() -> None:
         ast.UnOp(UnaryOp.NEG, ast.IntLit(3)),
         ast.BinOp(BinaryOp.MUL, ast.IntLit(4), ast.IntLit(2)),
     )
+    assert p("1 + 6 / 3") == ast.BinOp(
+        BinaryOp.ADD,
+        ast.IntLit(1),
+        ast.BinOp(BinaryOp.DIV, ast.IntLit(6), ast.IntLit(3)),
+    )
 
 
 def test_left_associativity() -> None:
     assert p("1 - 2 - 3") == ast.BinOp(
         BinaryOp.SUB, ast.BinOp(BinaryOp.SUB, ast.IntLit(1), ast.IntLit(2)), ast.IntLit(3)
+    )
+    assert p("8 / 4 * 2") == ast.BinOp(
+        BinaryOp.MUL, ast.BinOp(BinaryOp.DIV, ast.IntLit(8), ast.IntLit(4)), ast.IntLit(2)
     )
 
 

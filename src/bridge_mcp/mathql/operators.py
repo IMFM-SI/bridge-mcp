@@ -14,6 +14,7 @@ class BinaryOp(Enum):
     ADD = auto()
     SUB = auto()
     MUL = auto()
+    DIV = auto()
 
 
 class ComparisonOp(Enum):

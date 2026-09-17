@@ -15,10 +15,12 @@ from bridge_mcp.mathql.execute import compiled_sql_query, run_query
 
 _SUMMARY = """## Writing queries
 Expressions use fields (g.num_vertices), id(x) for an object's primary key, literals,
-arithmetic (+ - *), comparisons (== != < <= > >=), booleans (&& || !), defined/undefined
-for absence, list and tuple literals ([1, 2] and (1, 'a'), a tuple projected with .0),
-and calls to the functions a database declares (f(x, y)). A comparison needs both sides
-the same type. Call the `grammar` tool for the full grammar."""
+arithmetic (+ - * /, where / is the integer quotient truncated toward zero and a zero
+divisor yields an absent value), comparisons (== != < <= > >=), booleans (&& || !),
+defined/undefined for absence, list and tuple literals ([1, 2] and (1, 'a'), a tuple
+projected with .0), and calls to the functions a database declares (f(x, y)). A
+comparison needs both sides the same type. Call the `grammar` tool for the full
+grammar."""
 
 
 def _database_section(name: str, schema: dict[str, Any]) -> list[str]:

@@ -99,6 +99,7 @@ expr ::= "if" expr "then" expr "else" expr
        | expr "+" expr
        | expr "-" expr
        | expr "*" expr
+       | expr "/" expr
        | "!" expr
        | "-" expr
        | "defined" expr
@@ -136,8 +137,10 @@ The meaning and types of the above expressions is as follows:
   result are `bool`.
 - `e1 == e2`, `e1 != e2`, `e1 < e2`, `e1 <= e2`, `e1 > e2`, `e1 >= e2` — comparisons;
   the two operands must have the same type, and the result is `bool`.
-- `e1 + e2`, `e1 - e2`, `e1 * e2`, and `- e` — integer arithmetic; the operands and
-  the result are `int`.
+- `e1 + e2`, `e1 - e2`, `e1 * e2`, `e1 / e2`, and `- e` — integer arithmetic; the
+  operands and the result are `int`. `e1 / e2` is the quotient truncated toward zero,
+  so `7 / 2` is `3` and `-7 / 2` is `-3`. A zero divisor yields `null`, which
+  `undefined` detects.
 - `! e` — boolean negation; the operand and the result are `bool`.
 - `defined e` and `undefined e` — of type `bool`. `defined e` is `true` when `e`
   evaluates to a value other than `null`, and `false` when `e` evaluates to `null`
@@ -177,5 +180,5 @@ accepted equivalents:
 - `==` `!=` `<` `<=` `>` `>=`, comparison, non-associative (UTF-8 `=`, `≠`,
   `≤`, `≥`).
 - `+` `-`, addition and subtraction, left-associative.
-- `*`, multiplication, left-associative.
+- `*` `/`, multiplication and division, left-associative.
 - `!` (UTF-8 `¬`), unary `-`, `defined`, and `undefined`, the prefix operators.

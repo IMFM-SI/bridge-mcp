@@ -102,6 +102,16 @@ def _eval_unary_op(op: UnaryOp, value: object) -> object:
     assert_never(op)
 
 
+def _quotient(left: int, right: int) -> int:
+    """The quotient truncated toward zero, as SQLite's `/` computes it. A zero divisor
+    has no quotient; the failure raised here reaches the caller as an absent value, which
+    is what SQLite yields there."""
+    if right == 0:
+        raise MathQLError("division by zero")
+    magnitude = abs(left) // abs(right)
+    return -magnitude if (left < 0) != (right < 0) else magnitude
+
+
 def _eval_binary_op(op: BinaryOp, left: object, right: object) -> object:
     """Apply a binary operator to two evaluated operands, coercing both."""
     match op:
@@ -115,6 +125,8 @@ def _eval_binary_op(op: BinaryOp, left: object, right: object) -> object:
             return _as_int(left) - _as_int(right)
         case BinaryOp.MUL:
             return _as_int(left) * _as_int(right)
+        case BinaryOp.DIV:
+            return _quotient(_as_int(left), _as_int(right))
     assert_never(op)
 
 
