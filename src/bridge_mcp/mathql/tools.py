@@ -11,7 +11,7 @@ from mcp.server.mcpserver import MCPServer
 from bridge_mcp.databases import DATABASES, resolve
 from bridge_mcp.failure import anticipating
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.execute import run_query
+from bridge_mcp.mathql.execute import compiled_sql_query, run_query
 
 _SUMMARY = """## Writing queries
 Expressions use fields (g.num_vertices), id(x) for an object's primary key, literals,
@@ -46,8 +46,8 @@ def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
 def _build_instructions() -> str:
     default = next(iter(DATABASES), "")
     lines = [
-        f"Databases: {', '.join(DATABASES)}. `query` and `describe` take a `database` "
-        f"parameter selecting one (default: {default}).",
+        f"Databases: {', '.join(DATABASES)}. `query`, `compile` and `describe` take a "
+        f"`database` parameter selecting one (default: {default}).",
         "",
     ]
     for name, opened in DATABASES.items():
@@ -57,6 +57,25 @@ def _build_instructions() -> str:
 
 
 INSTRUCTIONS = _build_instructions()
+
+
+def _request(
+    domains: list[tuple[str, str]],
+    output: list[tuple[str, str]],
+    condition: str | None,
+    order: list[tuple[str, Literal["asc", "desc"]]] | None,
+    limit: int | None,
+    postprocess: list[tuple[str, str]] | None,
+) -> dict[str, Any]:
+    """The JSON form of a query, carrying each clause the caller gave."""
+    request: dict[str, Any] = {"domains": domains, "output": output}
+    clauses = (
+        ("condition", condition),
+        ("order", order),
+        ("limit", limit),
+        ("postprocess", postprocess),
+    )
+    return request | {name: value for name, value in clauses if value is not None}
 
 
 def register(mcp: MCPServer) -> None:
@@ -91,16 +110,40 @@ def register(mcp: MCPServer) -> None:
         database: which database to query (optional; the default is the first).
         """
         opened = resolve(database)
-        request: dict[str, Any] = {"domains": domains, "output": output}
-        if condition is not None:
-            request["condition"] = condition
-        if order is not None:
-            request["order"] = order
-        if limit is not None:
-            request["limit"] = limit
-        if postprocess is not None:
-            request["postprocess"] = postprocess
+        request = _request(domains, output, condition, order, limit, postprocess)
         return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
+
+    @mcp.tool()
+    @anticipating(MathQLError, ValueError)
+    def compile(
+        domains: list[tuple[str, str]],
+        output: list[tuple[str, str]],
+        condition: str | None = None,
+        order: list[tuple[str, Literal["asc", "desc"]]] | None = None,
+        limit: int | None = None,
+        postprocess: list[tuple[str, str]] | None = None,
+        database: str | None = None,
+    ) -> str:
+        """The SQL SELECT statement a MathQL query compiles to, without running it.
+
+        The arguments are those of `query`, so the same call goes to either tool. The
+        compiler reads the database's schema to find the table each domain lives in and
+        the join each domain field takes, and generates every alias. A `postprocess`
+        entry is evaluated over the returned rows rather than by the database, so it
+        leaves no trace in the statement.
+
+        domains: the variable bindings the query ranges over, e.g. [["g", "Graph"]].
+        output: [column name, expression] pairs, in the order the columns are to appear.
+        condition: a boolean expression; a row appears when it holds.
+        order: [expression, "asc"|"desc"] pairs sorting the rows, applied in turn.
+        limit: how many rows to return at most.
+        postprocess: [column name, expression] pairs computed per row after the database
+            answers.
+        database: which database to compile against (optional; the default is the first).
+        """
+        opened = resolve(database)
+        request = _request(domains, output, condition, order, limit, postprocess)
+        return compiled_sql_query(opened.database, opened.is_safe_alias, request)
 
     @mcp.tool()
     @anticipating(ValueError)

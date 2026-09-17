@@ -6,13 +6,9 @@ from typing import Any
 
 import pytest
 
-from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.databases import math_data, sym_ob_small
-from bridge_mcp.mathql.execute import database_path, safe_alias_predicate
-from bridge_mcp.mathql.query_json import from_json
-from bridge_mcp.mathql.typecheck import check_query
+from bridge_mcp.mathql.execute import compiled_sql_query, database_path, safe_alias_predicate
 
 SHAPES: list[dict[str, Any]] = [
     {"domains": [], "output": []},
@@ -58,9 +54,7 @@ def _explained(
     is_safe_alias: Callable[[str], bool],
     request: Any,
 ) -> None:
-    rendered = sql.render_query(
-        compile_query(database, is_safe_alias, check_query(database, from_json(request)))
-    )
+    rendered = compiled_sql_query(database, is_safe_alias, request)
     connection.execute(f"EXPLAIN {rendered}")
 
 

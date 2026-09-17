@@ -5,9 +5,8 @@ from collections.abc import Callable
 
 import pytest
 
-from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.errors import MathQLError
+from bridge_mcp.mathql.execute import compiled_sql_query
 from bridge_mcp.mathql.query import Query
 from bridge_mcp.mathql.query_json import from_json
 from bridge_mcp.mathql.typecheck import check_query
@@ -22,7 +21,7 @@ def _typed(request: dict[str, object]) -> Query:
 
 
 def _rendered_by(is_safe_alias: Callable[[str], bool], request: dict[str, object]) -> str:
-    return sql.render_query(compile_query(TOY, is_safe_alias, _typed(request)))
+    return compiled_sql_query(TOY, is_safe_alias, request)
 
 
 def _rendered(request: dict[str, object]) -> str:

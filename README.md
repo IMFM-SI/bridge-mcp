@@ -63,9 +63,9 @@ these tools.
 
 ## Databases
 
-The `query` and `describe` tools take a `database` parameter naming the database to
-use; calling `describe` with no arguments lists the available databases. Within a
-database, the `Source` and `Provenance` domains record which tools and upstream
+The `query`, `compile` and `describe` tools take a `database` parameter naming the
+database to use; calling `describe` with no arguments lists the available databases.
+Within a database, the `Source` and `Provenance` domains record which tools and upstream
 databases the facts rest on.
 
 ### Graphs
@@ -98,17 +98,18 @@ derived from them. The file (≈ 298 MB) ships separately; download it from
 
 ## Available tools
 
-Besides `query`, `describe` and `grammar`, the server offers `search` and `derivation`
-into π-Base, and graph tools built on `networkx`. Where the database records an
-invariant's *value*, such as the clique number, a graph tool returns a *witness*, an
-actual maximum clique. Each tool carries its own description; a running server lists
-them all.
+Besides `query`, `compile`, `describe` and `grammar`, the server offers `search` and
+`derivation` into π-Base, and graph tools built on `networkx`. `compile` takes the
+arguments `query` takes and returns the SQL statement the query compiles to, without
+running it. Where the database records an invariant's *value*, such as the clique
+number, a graph tool returns a *witness*, an actual maximum clique. Each tool carries
+its own description; a running server lists them all.
 
 ## Choosing components
 
-The server is assembled from components: `mathql` (the `query`, `describe` and `grammar`
-tools), `pibase` (`search` and `derivation`), `networkx` (the graph tools), and `sql`.
-`bridge-mcp --components mathql,networkx` serves the named ones, and
+The server is assembled from components: `mathql` (the `query`, `compile`, `describe`
+and `grammar` tools), `pibase` (`search` and `derivation`), `networkx` (the graph tools),
+and `sql`. `bridge-mcp --components mathql,networkx` serves the named ones, and
 `bridge-mcp --list-components` prints the names. The default is `mathql,pibase,networkx`,
 so `sql` runs only when asked for.
 

@@ -6,12 +6,8 @@ from typing import Any
 
 import pytest
 
-from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path
-from bridge_mcp.mathql.query_json import from_json
-from bridge_mcp.mathql.typecheck import check_query
+from bridge_mcp.mathql.execute import compiled_sql_query, database_path
 from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
@@ -21,11 +17,7 @@ def test_multi_column_join_renders() -> None:
         "domains": [["g", "Graph"]],
         "output": [["aut", "g.automorphism_group.structure_description"]],
     }
-    rendered = sql.render_query(
-        compile_query(
-            database, safe_alias(database), check_query(database, from_json(request))
-        )
-    )
+    rendered = compiled_sql_query(database, safe_alias(database), request)
     assert (
         'LEFT JOIN "small_group" AS c3'
         ' ON c3."order" = c1."aut_group_order"'

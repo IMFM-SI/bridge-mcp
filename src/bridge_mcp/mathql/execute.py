@@ -307,6 +307,23 @@ def safe_alias_predicate(
     return lambda name: name.lower() not in taken
 
 
+def compiled_sql(
+    database: Database, is_safe_alias: Callable[[str], bool], q: query.Query
+) -> str:
+    """The SQL SELECT statement a type-checked query compiles to. The postprocess entries
+    have no SQL image and leave no trace in it."""
+    return sql.render_query(compile_query(database, is_safe_alias, q))
+
+
+def compiled_sql_query(
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    request: Mapping[str, Any],
+) -> str:
+    """Parse, type-check and compile a query from its JSON form, returning its SQL."""
+    return compiled_sql(database, is_safe_alias, check_query(database, from_json(request)))
+
+
 def run(
     connection: sqlite3.Connection,
     database: Database,
@@ -314,7 +331,7 @@ def run(
     q: query.Query,
 ) -> list[list[tuple[str, object]]]:
     """Run a type-checked query, returning each row as its list of name/value pairs."""
-    rendered = sql.render_query(compile_query(database, is_safe_alias, q))
+    rendered = compiled_sql(database, is_safe_alias, q)
     functions = {f.name: f for f in database.post_functions}
     return [_row(q, functions, row) for row in connection.execute(rendered).fetchall()]
 

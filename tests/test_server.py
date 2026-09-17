@@ -11,7 +11,7 @@ from bridge_mcp.server import mcp
 
 def test_all_tools_registered() -> None:
     names = {tool.name for tool in asyncio.run(mcp.list_tools())}
-    assert {"query", "describe", "grammar"} <= names
+    assert {"query", "compile", "describe", "grammar"} <= names
     assert {"edge_list", "neighbors", "shortest_path"} <= names
 
 
@@ -36,3 +36,14 @@ def test_a_query_error_carries_its_message() -> None:
 def test_a_malformed_graph6_string_carries_its_message() -> None:
     with pytest.raises(ToolError, match="graph6"):
         asyncio.run(mcp.call_tool("edge_list", {"graph6": "!!!"}))
+
+
+def test_compile_renders_the_join_a_domain_field_needs() -> None:
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["graph6", "id(g)"]],
+        "condition": "g.automorphism_group.is_abelian",
+    }
+    statement = asyncio.run(mcp.call_tool("compile", request)).structured_content["result"]
+    assert 'LEFT JOIN "small_group"' in statement
+    assert '"aut_group_order"' in statement and '"aut_group_index"' in statement

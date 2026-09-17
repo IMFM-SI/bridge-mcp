@@ -2,20 +2,15 @@
 
 from typing import Any
 
-from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.query_json import from_json
-from bridge_mcp.mathql.typecheck import check_query
+from bridge_mcp.mathql.execute import compiled_sql_query
 from tests.aliases import safe_alias
 
 _safe_alias = safe_alias(database)
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    return sql.render_query(
-        compile_query(database, _safe_alias, check_query(database, from_json(request)))
-    )
+    return compiled_sql_query(database, _safe_alias, request)
 
 
 def test_render_simple() -> None:

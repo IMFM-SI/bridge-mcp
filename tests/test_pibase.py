@@ -7,21 +7,14 @@ from typing import Any
 
 import pytest
 
-from bridge_mcp.mathql import sql
-from bridge_mcp.mathql.compile import compile_query
 from bridge_mcp.mathql.databases.math_data import database
-from bridge_mcp.mathql.execute import database_path
-from bridge_mcp.mathql.query_json import from_json
-from bridge_mcp.mathql.typecheck import check_query
+from bridge_mcp.mathql.execute import compiled_sql_query, database_path
 from tests.aliases import safe_alias
 from tests.rows import rows_by_name
 
 
 def _rendered(request: dict[str, Any]) -> str:
-    compiled = compile_query(
-        database, safe_alias(database), check_query(database, from_json(request))
-    )
-    return sql.render_query(compiled)
+    return compiled_sql_query(database, safe_alias(database), request)
 
 
 def test_composite_key_id() -> None:
