@@ -1,7 +1,7 @@
 # Handoff: the mcp 2 port
 
-Branch `update-mcp-version`, five commits ahead of `main`, working tree clean, **nothing
-pushed**. Remote is `git@github.com:IMFM-SI/bridge-mcp.git`.
+The work is on `main`: five commits on top of `0358663`, followed by the commit adding this
+file. Remote is `git@github.com:IMFM-SI/bridge-mcp.git`.
 
 This repository and `../bridge-query-language` are developed in tandem. They hold two
 implementations of one language, MathQL: in Lean there, in Python here. This repository is
@@ -15,10 +15,10 @@ Verified on 2026-10-09 in `.venv` (Python 3.14.3, mcp 2.2.0):
 - `pytest -q` — 239 passed, 4 skipped.
 - `mypy src` — clean, 44 files.
 - `ruff format --check .` — clean, 75 files.
-- `ruff check .` — **31 findings, all of them present on `main` too**. They are `LOG015`,
-  `ISC004`, `DTZ011`, `BLE001`, `EXE001` in `generate/` and `scripts/`, plus two `I001`
-  import-sort findings. CI runs `ruff check .` and so fails on `main` as well; this is not
-  the port's doing and was left alone.
+- `ruff check .` — **31 findings, all of them present at `0358663` too**, before this work.
+  They are `LOG015`, `ISC004`, `DTZ011`, `BLE001`, `EXE001` in `generate/` and `scripts/`,
+  plus two `I001` import-sort findings. CI runs `ruff check .` and so failed before this
+  work as well.
 
 The 4 skips are `tests/test_sym_ob.py`: `sym-ob-small.db` is not present. It is a ≈ 298 MB
 download, see `README.md`.
@@ -161,12 +161,10 @@ in Python.
 
 These are decided. Each is to be done.
 
-1. **Push the branch `update-mcp-version` and open a pull request.** Nothing has left the
-   old machine.
-2. **Add the division operator to the Lean implementation and to `LANGUAGE.md`.** Specified
+1. **Add the division operator to the Lean implementation and to `LANGUAGE.md`.** Specified
    in `../bridge-query-language/HANDOFF.md`, with two cautions about Lean's integer
    division.
-3. **Fix the encoding of booleans nested in JSON.** Under the rule above the fix is
+2. **Fix the encoding of booleans nested in JSON.** Under the rule above the fix is
    designed in Lean first; `../bridge-query-language/HANDOFF.md` carries it, with the
    evidence. The Python implementation needs the same fix after. In short: a boolean
    inside a tuple or a list comes back as `1` or `0` instead of `true` or `false`.
@@ -188,7 +186,7 @@ test databases of both repositories.
 
 Nothing has been decided about these. They are recorded so they do not surprise anyone.
 
-- `ruff check .` reports 31 findings, the same 31 it reported on `main` before this branch,
+- `ruff check .` reports 31 findings, the same 31 it reported at `0358663` before this work,
   so continuous integration's lint step fails on `main` too.
 - The maniplex database `sym-ob-small.db` is absent, so `tests/test_sym_ob.py` is skipped.
 
