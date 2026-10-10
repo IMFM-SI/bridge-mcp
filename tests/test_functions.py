@@ -8,7 +8,7 @@ import pytest
 
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.execute import database_path, run_query
+from bridge_mcp.mathql.execute import database_path, run_query, safe_alias_predicate
 from bridge_mcp.mathql.functions import FUNCTIONS, factorize, maximum, minimum
 from bridge_mcp.mathql.types import IntType, ListType, ProductType, StringType
 
@@ -286,6 +286,7 @@ def test_graph_functions_over_the_bundled_graphs(connection: sqlite3.Connection)
     rows = run_query(
         connection,
         database,
+        safe_alias_predicate(connection, database),
         {
             "domains": [["g", "Graph"]],
             "output": [["graph6", "g.graph6"], ["degrees", "g.degree_sequence"]],
@@ -320,6 +321,7 @@ def test_the_stored_invariants_agree_with_the_functions(
     rows = run_query(
         connection,
         database,
+        safe_alias_predicate(connection, database),
         {
             "domains": [["g", "Graph"]],
             "output": [
@@ -351,6 +353,7 @@ def test_factorize_over_the_group_orders(connection: sqlite3.Connection) -> None
     rows = run_query(
         connection,
         database,
+        safe_alias_predicate(connection, database),
         {
             "domains": [["g", "Group"]],
             "output": [["order", "g.order"]],
@@ -366,6 +369,7 @@ def test_a_failing_call_yields_null(connection: sqlite3.Connection) -> None:
     rows = run_query(
         connection,
         database,
+        safe_alias_predicate(connection, database),
         {
             "domains": [["g", "Graph"]],
             "output": [["graph6", "g.graph6"]],
@@ -381,6 +385,7 @@ def test_a_call_at_the_wrong_type_is_rejected(connection: sqlite3.Connection) ->
         run_query(
             connection,
             database,
+            safe_alias_predicate(connection, database),
             {
                 "domains": [["g", "Graph"]],
                 "output": [["graph6", "g.graph6"]],
@@ -396,6 +401,7 @@ def test_a_postprocess_function_is_not_callable_in_the_condition(
         run_query(
             connection,
             database,
+            safe_alias_predicate(connection, database),
             {
                 "domains": [["g", "Graph"]],
                 "output": [["graph6", "g.graph6"]],
