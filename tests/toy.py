@@ -49,6 +49,6 @@ DATABASE = Database(
     constants=(),
     domains={"Graph": GRAPH, "Maniplex": MANIPLEX},
     examples=(),
-    sql_functions=(SqlFunction("size", (StringType(),), IntType(), "length"),),
-    post_functions=(PostFunction("plus", (IntType(), IntType()), IntType(), plus),),
+    sql_functions=(SqlFunction("size", (StringType(),), IntType(), "length", "the length"),),
+    post_functions=(PostFunction("plus", (IntType(), IntType()), IntType(), plus, "the sum"),),
 )

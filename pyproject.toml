@@ -15,6 +15,7 @@ dependencies = [
     "networkx",
     "numpy",
     "rapidfuzz",
+    "sympy",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +34,7 @@ packages = ["src/bridge_mcp"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["networkx.*"]
+module = ["networkx.*", "sympy.*"]
 ignore_missing_imports = true
 
 [tool.ruff]
