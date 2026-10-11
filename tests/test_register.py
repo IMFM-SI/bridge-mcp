@@ -83,3 +83,22 @@ def test_a_function_without_implementation_is_left_to_sqlite(
     connection: sqlite3.Connection,
 ) -> None:
     assert select(connection, "length('abc')") == 3
+
+
+def test_a_repeated_call_is_computed_once() -> None:
+    calls: list[object] = []
+
+    def square(args: Sequence[object]) -> object:
+        calls.append(args[0])
+        return args[0] * args[0] if type(args[0]) is int else None
+
+    function = SqlFunction("sq", (IntType(),), IntType(), "toy_sq", implementation=square)
+    connection = sqlite3.connect(":memory:")
+    register_functions(connection, dataclasses.replace(TOY, sql_functions=(function,)))
+    statement = (
+        "SELECT toy_sq(n) FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3) "
+        "WHERE toy_sq(n) > 1"
+    )
+    assert connection.execute(statement).fetchall() == [(4,), (9,)]
+    assert sorted(calls) == [1, 2, 3]
+    connection.close()

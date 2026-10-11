@@ -1,5 +1,6 @@
-"""Checks for the postprocess functions the databases declare."""
+"""Checks for the functions the databases declare, in postprocess and mid-query."""
 
+import dataclasses
 import sqlite3
 from collections.abc import Iterator, Sequence
 
@@ -7,6 +8,8 @@ import networkx
 import pytest
 
 from bridge_mcp.mathql import execute
+from bridge_mcp.mathql.compile import Mode
+from bridge_mcp.mathql.database import SqlFunction
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import (
@@ -567,6 +570,98 @@ def test_a_statement_outside_a_query_has_no_limit(
     run_query(connection, database, safe_alias_predicate(connection, database), _EVERY_GRAPH)
     statement = "SELECT count(*) FROM graph WHERE mathql_numVertices(graph6) = num_vertices"
     assert connection.execute(statement).fetchone()[0] > 0
+
+
+# --- sound and complete ---
+
+_DIAMETER_AT_MOST_2 = {
+    "domains": [["g", "Graph"]],
+    "output": [["graph6", "g.graph6"]],
+    "condition": "g.num_vertices == 4 && diameter(g.graph6) <= 2",
+    "postprocess": [["components", "componentSizes(graph6)"]],
+}
+
+
+def _answer(
+    connection: sqlite3.Connection, request: dict[str, object], mode: Mode
+) -> execute.Answer:
+    return run_query(
+        connection, database, safe_alias_predicate(connection, database), request, mode
+    )
+
+
+def test_complete_adds_the_rows_where_the_condition_is_unknown(
+    connection: sqlite3.Connection,
+) -> None:
+    sound = _answer(connection, _DIAMETER_AT_MOST_2, "sound").rows
+    complete = [dict(row) for row in _answer(connection, _DIAMETER_AT_MOST_2, "complete").rows]
+    certain = [row["graph6"] for row in complete if row["certain"]]
+    unknown = [row for row in complete if not row["certain"]]
+    assert certain == [dict(row)["graph6"] for row in sound]
+    assert len(certain) == 5
+    assert len(unknown) == 5
+    assert all(len(row["components"]) > 1 for row in unknown)
+
+
+def test_the_marker_follows_the_output_and_precedes_the_postprocess(
+    connection: sqlite3.Connection,
+) -> None:
+    row = _answer(connection, _DIAMETER_AT_MOST_2, "complete").rows[0]
+    assert [name for name, _ in row] == ["graph6", "certain", "components"]
+
+
+def test_without_unknowns_both_modes_agree(connection: sqlite3.Connection) -> None:
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["graph6", "g.graph6"]],
+        "condition": "g.num_vertices == 4 && g.is_connected",
+    }
+    sound = _answer(connection, request, "sound").rows
+    complete = _answer(connection, request, "complete").rows
+    assert [row + [("certain", True)] for row in sound] == complete
+
+
+def test_complete_compiles_to_is_not_false(connection: sqlite3.Connection) -> None:
+    rendered = compiled_sql_query(
+        database, safe_alias_predicate(connection, database), _DIAMETER_AT_MOST_2, "complete"
+    )
+    assert "IS TRUE) AS" in rendered
+    assert rendered.endswith("IS NOT FALSE)")
+
+
+def test_complete_reserves_the_name_certain(connection: sqlite3.Connection) -> None:
+    request = {"domains": [["g", "Graph"]], "output": [["certain", "g.graph6"]]}
+    with pytest.raises(MathQLError, match="reserved"):
+        _answer(connection, request, "complete")
+
+
+def test_complete_computes_each_call_once(connection: sqlite3.Connection) -> None:
+    calls: list[object] = []
+
+    def counted(function: SqlFunction) -> SqlFunction:
+        implementation = function.implementation
+        assert implementation is not None
+
+        def count(args: Sequence[object]) -> object:
+            calls.append(args)
+            return implementation(args)
+
+        return dataclasses.replace(function, implementation=count)
+
+    counting = dataclasses.replace(
+        database, sql_functions=tuple(counted(f) for f in database.sql_functions)
+    )
+    register_functions(connection, counting)
+    answer = run_query(
+        connection,
+        counting,
+        safe_alias_predicate(connection, counting),
+        _DIAMETER_AT_MOST_2,
+        "complete",
+    )
+    graphs_on_4 = connection.execute("SELECT count(*) FROM graph WHERE num_vertices = 4")
+    assert len(answer.rows) == 10
+    assert len(calls) == graphs_on_4.fetchone()[0]
 
 
 def test_sqlite_keeps_its_own_min_and_max(connection: sqlite3.Connection) -> None:

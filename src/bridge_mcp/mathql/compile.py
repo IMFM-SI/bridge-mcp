@@ -8,7 +8,7 @@ import functools
 import itertools
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import assert_never
+from typing import Literal, assert_never
 
 from bridge_mcp.mathql import expr, sql
 from bridge_mcp.mathql.database import Column, Database, Schema
@@ -16,6 +16,11 @@ from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.operators import BinaryOp
 from bridge_mcp.mathql.query import Binding, Query
 from bridge_mcp.mathql.types import ListType, ProductType
+
+Mode = Literal["sound", "complete"]
+"""Which rows a condition that is NULL on them, neither true nor false, keeps: none when
+sound, so that each row returned matches; all of them when complete, so that no row that
+might match is missing, each row then carrying whether it matches for certain."""
 
 
 @dataclass(frozen=True)
@@ -293,10 +298,14 @@ def _bind_variable(
 
 
 def compile_query(
-    database: Database, is_safe_alias: Callable[[str], bool], q: Query
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    q: Query,
+    mode: Mode = "sound",
 ) -> sql.Query:
     """Compile a type-checked query to a SQL query, with `is_safe_alias` deciding which
-    names may serve as aliases."""
+    names may serve as aliases. In complete mode the condition admits a row on which it
+    is NULL, and a last output column says whether it is true there."""
     idents: dict[str, ContextEntry] = {
         **{c.name: ConstEntry(c.sql) for c in database.constants},
         **{b.var: DomainEntry(b.domain) for b in q.variables},
@@ -327,11 +336,17 @@ def compile_query(
     cond = compile_expr(ctx, state, q.condition)
     keys = ((compile_expr(aliased, state, entry.key), entry.direction) for entry in q.order)
     order = tuple((e, direction) for e, direction in keys if not sql.is_constant(e))
+    match mode:
+        case "sound":
+            admitted = cond
+        case "complete":
+            output = (*output, (sql.IsTrue(cond), _fresh_safe_alias(ctx, state)))
+            admitted = sql.IsNotFalse(cond)
     return sql.Query(
         froms=froms,
         joins=tuple(state.joins),
         output=output,
-        cond=cond,
+        cond=admitted,
         order=order,
         limit=q.limit,
     )

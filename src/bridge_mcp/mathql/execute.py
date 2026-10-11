@@ -6,6 +6,7 @@ entries are evaluated here, over each decoded row.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sqlite3
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import Any, assert_never
 
 from bridge_mcp.mathql import expr, query, sql
-from bridge_mcp.mathql.compile import compile_query
+from bridge_mcp.mathql.compile import Mode, compile_query
 from bridge_mcp.mathql.database import Database, PostFunction
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.operators import BinaryOp, ComparisonOp, UnaryOp
@@ -126,7 +127,7 @@ def _as_sql_function(
         try:
             args = [_decode_cell(ty, cell) for ty, cell in zip(arg_types, cells, strict=True)]
             return _encode_cell(result_ty, implementation(args))
-        except Exception:
+        except Exception:  # noqa: BLE001 - whatever escapes here aborts the whole query
             return None
 
     return call
@@ -321,12 +322,24 @@ def _decode_row(q: query.Query, row: Sequence[Any]) -> list[tuple[str, object]]:
         return []
 
 
+CERTAIN = "certain"
+"""The name of the column that says, in complete mode, whether a row matches for
+certain."""
+
+
 def _row(
-    q: query.Query, functions: Mapping[str, PostFunction], row: Sequence[Any]
+    q: query.Query, functions: Mapping[str, PostFunction], mode: Mode, row: Sequence[Any]
 ) -> list[tuple[str, object]]:
-    """One result row: its output cells, then its postprocess entries."""
-    output = _decode_row(q, row)
-    return output + eval_postprocess(PostEnvironment(dict(output), functions), q.postprocess)
+    """One result row: its output cells, in complete mode whether it matches for certain,
+    then its postprocess entries."""
+    match mode:
+        case "sound":
+            cells, marker = row, []
+        case "complete":
+            cells, marker = row[:-1], [(CERTAIN, bool(row[-1]))]
+    output = _decode_row(q, cells)
+    post = eval_postprocess(PostEnvironment(dict(output), functions), q.postprocess)
+    return output + marker + post
 
 
 def _column_names(connection: sqlite3.Connection, table: str) -> list[str]:
@@ -358,17 +371,24 @@ def safe_alias_predicate(
     return lambda name: name.lower() not in taken
 
 
+_CACHE_SIZE = 256
+"""How many recent results each registered function remembers."""
+
+
 def register_functions(connection: sqlite3.Connection, database: Database) -> None:
     """Make each SQL function of `database` that has an implementation callable on
-    `connection`, under its SQL name."""
+    `connection`, under its SQL name. Each remembers its recent results, so a call
+    SQLite repeats on one row, as a complete query does for its marker, or as a query
+    calling the same function in two clauses does, is computed once."""
     for function in database.sql_functions:
         if function.implementation is not None:
+            wrapper = _as_sql_function(
+                function.arg_types, function.result_ty, function.implementation
+            )
             connection.create_function(
                 function.sql_name,
                 len(function.arg_types),
-                _as_sql_function(
-                    function.arg_types, function.result_ty, function.implementation
-                ),
+                functools.lru_cache(maxsize=_CACHE_SIZE)(wrapper),
                 deterministic=True,
             )
 
@@ -406,20 +426,25 @@ class Answer:
 
 
 def compiled_sql(
-    database: Database, is_safe_alias: Callable[[str], bool], q: query.Query
+    database: Database,
+    is_safe_alias: Callable[[str], bool],
+    q: query.Query,
+    mode: Mode = "sound",
 ) -> str:
     """The SQL SELECT statement a type-checked query compiles to. The postprocess entries
     have no SQL image and leave no trace in it."""
-    return sql.render_query(compile_query(database, is_safe_alias, q))
+    return sql.render_query(compile_query(database, is_safe_alias, q, mode))
 
 
 def compiled_sql_query(
     database: Database,
     is_safe_alias: Callable[[str], bool],
     request: Mapping[str, Any],
+    mode: Mode = "sound",
 ) -> str:
     """Parse, type-check and compile a query from its JSON form, returning its SQL."""
-    return compiled_sql(database, is_safe_alias, check_query(database, from_json(request)))
+    q = check_query(database, from_json(request))
+    return compiled_sql(database, is_safe_alias, q, mode)
 
 
 def run(
@@ -427,17 +452,21 @@ def run(
     database: Database,
     is_safe_alias: Callable[[str], bool],
     q: query.Query,
+    mode: Mode = "sound",
 ) -> Answer:
     """Run a type-checked query within `TIME_LIMIT` seconds, on a connection `limit_time`
     was applied to. Past the limit, the rows read so far are returned, marked
     truncated."""
-    rendered = compiled_sql(database, is_safe_alias, q)
+    names = [column.name for column in (*q.output, *q.postprocess)]
+    if mode == "complete" and CERTAIN in names:
+        raise MathQLError(f"in complete mode the column name {CERTAIN} is reserved")
+    rendered = compiled_sql(database, is_safe_alias, q, mode)
     functions = {f.name: f for f in database.post_functions}
     rows: list[list[tuple[str, object]]] = []
     _deadline.at = time.monotonic() + TIME_LIMIT
     try:
         for row in connection.execute(rendered):
-            rows.append(_row(q, functions, row))
+            rows.append(_row(q, functions, mode, row))
     except sqlite3.OperationalError as error:
         if str(error) == "interrupted":
             return Answer(rows, truncated=True)
@@ -453,6 +482,8 @@ def run_query(
     database: Database,
     is_safe_alias: Callable[[str], bool],
     request: Mapping[str, Any],
+    mode: Mode = "sound",
 ) -> Answer:
     """Parse, type-check, compile, and run a query from its JSON form."""
-    return run(connection, database, is_safe_alias, check_query(database, from_json(request)))
+    q = check_query(database, from_json(request))
+    return run(connection, database, is_safe_alias, q, mode)

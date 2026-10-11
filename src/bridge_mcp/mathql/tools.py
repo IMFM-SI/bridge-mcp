@@ -106,11 +106,19 @@ def register(mcp: MCPServer) -> None:
         limit: int | None = None,
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
+        mode: Literal["sound", "complete"] = "sound",
     ) -> dict[str, Any]:
         """Run a MathQL query and return {"rows": …, "truncated": …}. Each row is a list
         of [column name, value] pairs, in the order `output` then `postprocess` name them.
         A query is stopped after 30 seconds; `truncated` is then true and the rows are
         those found by then, each a real match, with the others missing.
+
+        A condition is neither true nor false on a row where a value it uses is absent,
+        such as the diameter of a disconnected graph. `mode` says what such a row does:
+        "sound" leaves it out, so every row returned matches; "complete" keeps it, so no
+        row that might match is missing, and each row then carries ["certain", true] when
+        the condition holds there and ["certain", false] when it is unknown, placed after
+        the output columns.
 
         A query ranges over one object per domain variable and returns one row per
         combination the condition holds of. The `grammar` tool gives the expression
@@ -125,10 +133,13 @@ def register(mcp: MCPServer) -> None:
         postprocess: [column name, expression] pairs computed per row after the database
             answers; each may name an output column and the entries before it.
         database: which database to query (optional; the default is the first).
+        mode: "sound" (the default) or "complete", as above.
         """
         opened = resolve(database)
         request = _request(domains, output, condition, order, limit, postprocess)
-        answer = run_query(opened.connection, opened.database, opened.is_safe_alias, request)
+        answer = run_query(
+            opened.connection, opened.database, opened.is_safe_alias, request, mode
+        )
         return {"rows": answer.rows, "truncated": answer.truncated}
 
     @mcp.tool()
@@ -141,6 +152,7 @@ def register(mcp: MCPServer) -> None:
         limit: int | None = None,
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
+        mode: Literal["sound", "complete"] = "sound",
     ) -> str:
         """The SQL SELECT statement a MathQL query compiles to, without running it.
 
@@ -158,10 +170,11 @@ def register(mcp: MCPServer) -> None:
         postprocess: [column name, expression] pairs computed per row after the database
             answers.
         database: which database to compile against (optional; the default is the first).
+        mode: "sound" (the default) or "complete", as `query` takes it.
         """
         opened = resolve(database)
         request = _request(domains, output, condition, order, limit, postprocess)
-        return compiled_sql_query(opened.database, opened.is_safe_alias, request)
+        return compiled_sql_query(opened.database, opened.is_safe_alias, request, mode)
 
     @mcp.tool()
     @anticipating(ValueError)
