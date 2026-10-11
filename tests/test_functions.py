@@ -400,20 +400,80 @@ def test_a_call_at_the_wrong_type_is_rejected(connection: sqlite3.Connection) ->
         )
 
 
-def test_a_postprocess_function_is_not_callable_in_the_condition(
+# --- mid-query: in the condition, the output and the order ---
+
+
+def test_each_function_is_callable_mid_query_at_the_same_signature() -> None:
+    post = {f.name: f.signature() for f in database.post_functions}
+    mid = {f.name: f.signature() for f in database.sql_functions}
+    assert mid == post
+
+
+def test_the_slow_functions_say_so() -> None:
+    slow = {f.name for f in database.sql_functions if "slow" in f.doc}
+    assert slow == {"charPoly", "numSpanningTrees"}
+
+
+def test_a_function_in_the_condition(connection: sqlite3.Connection) -> None:
+    rows = run_query(
+        connection,
+        database,
+        safe_alias_predicate(connection, database),
+        {
+            "domains": [["g", "Graph"]],
+            "output": [["graph6", "g.graph6"]],
+            "condition": "g.num_vertices == 4 && diameter(g.graph6) == 1",
+        },
+    )
+    assert rows == [[("graph6", "C~")]]
+
+
+def test_a_function_in_the_output_and_the_order(connection: sqlite3.Connection) -> None:
+    rows = run_query(
+        connection,
+        database,
+        safe_alias_predicate(connection, database),
+        {
+            "domains": [["g", "Graph"]],
+            "output": [
+                ["degrees", "degreeSequence(g.graph6)"],
+                ["omega", "cliqueNumber(g.graph6)"],
+            ],
+            "condition": "g.num_vertices == 4 && g.is_connected",
+            "order": [["cliqueNumber(g.graph6)", "desc"]],
+            "limit": 2,
+        },
+    )
+    assert rows[0] == [("degrees", [3, 3, 3, 3]), ("omega", 4)]
+    assert dict(rows[1])["omega"] == 3
+
+
+def test_a_row_where_the_function_is_undefined_is_dropped_from_the_condition(
     connection: sqlite3.Connection,
 ) -> None:
-    with pytest.raises(MathQLError, match="unknown function"):
-        run_query(
-            connection,
-            database,
-            safe_alias_predicate(connection, database),
-            {
-                "domains": [["g", "Graph"]],
-                "output": [["graph6", "g.graph6"]],
-                "condition": "numEdges(g.graph6) == 3",
-            },
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["graph6", "g.graph6"], ["d", "diameter(g.graph6)"]],
+        "condition": "g.num_vertices == 4",
+    }
+    rows = run_query(connection, database, safe_alias_predicate(connection, database), request)
+    undefined = [row for row in rows if dict(row)["d"] is None]
+    assert len(rows) == 11
+    assert len(undefined) == 5
+    request["condition"] = "g.num_vertices == 4 && diameter(g.graph6) >= 0"
+    assert (
+        len(
+            run_query(
+                connection, database, safe_alias_predicate(connection, database), request
+            )
         )
+        == 6
+    )
+
+
+def test_sqlite_keeps_its_own_min_and_max(connection: sqlite3.Connection) -> None:
+    assert connection.execute("SELECT min(3, 1), max(3, 1)").fetchone() == (1, 3)
+    assert connection.execute("SELECT mathql_min('[3,1,2]')").fetchone() == (1,)
 
 
 def test_every_declared_function_rejects_arguments_of_the_wrong_kind() -> None:

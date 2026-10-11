@@ -8,7 +8,12 @@ import pytest
 
 from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.databases import math_data, sym_ob_small
-from bridge_mcp.mathql.execute import compiled_sql_query, database_path, safe_alias_predicate
+from bridge_mcp.mathql.execute import (
+    compiled_sql_query,
+    database_path,
+    register_functions,
+    safe_alias_predicate,
+)
 
 SHAPES: list[dict[str, Any]] = [
     {"domains": [], "output": []},
@@ -63,7 +68,9 @@ def connection() -> sqlite3.Connection:
     path = database_path()
     if not path.exists():
         pytest.skip(f"{path} not present")
-    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    register_functions(connection, math_data.database)
+    return connection
 
 
 @pytest.fixture
@@ -90,6 +97,7 @@ def test_every_maniplex_example_parses() -> None:
     if not path.exists():
         pytest.skip(f"{path} not present")
     connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    register_functions(connection, sym_ob_small.database)
     is_safe_alias = safe_alias_predicate(connection, sym_ob_small.database)
     for example in sym_ob_small.database.examples:
         _explained(connection, sym_ob_small.database, is_safe_alias, example.query)

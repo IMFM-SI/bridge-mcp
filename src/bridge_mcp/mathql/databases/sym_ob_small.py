@@ -5,7 +5,7 @@ from importlib import resources
 from pathlib import Path
 
 from bridge_mcp.mathql.database import Column, Database, Example, ForeignKey, Schema
-from bridge_mcp.mathql.functions import FUNCTIONS
+from bridge_mcp.mathql.functions import FUNCTIONS, SQL_FUNCTIONS
 from bridge_mcp.mathql.types import (
     BoolType,
     IntType,
@@ -286,5 +286,6 @@ database = Database(
             },
         ),
     ),
+    sql_functions=SQL_FUNCTIONS,
     post_functions=FUNCTIONS,
 )

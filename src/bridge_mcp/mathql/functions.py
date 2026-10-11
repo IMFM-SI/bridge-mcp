@@ -1,6 +1,7 @@
-"""The postprocess functions the databases make callable: integer factorization with
-sympy, the extremes of a list of integers, and invariants of the graph a graph6 or
-sparse6 string encodes, with networkx and sympy.
+"""The functions the databases make callable: integer factorization with sympy, the
+extremes of a list of integers, and invariants of the graph a graph6 or sparse6 string
+encodes, with networkx and sympy. Each is callable in the postprocess clause, and as a
+SQL function in the condition, the output and the order.
 
 A graph function takes the encoded graph as a string, so the functions compose: a
 postprocess entry may pass the graph6 string another entry produced.
@@ -14,7 +15,7 @@ import networkx
 import sympy
 
 from bridge_mcp.graph.invariants import chromatic_number, girth
-from bridge_mcp.mathql.database import PostFunction
+from bridge_mcp.mathql.database import PostFunction, SqlFunction
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.types import IntType, ListType, ProductType, StringType
 
@@ -316,3 +317,26 @@ FUNCTIONS: tuple[PostFunction, ...] = (
         f"{_SEARCH_LIMIT} vertices",
     ),
 )
+
+# The functions whose call, at up to a few milliseconds per graph, makes a condition over
+# every graph take minutes rather than seconds.
+_SLOW = frozenset({"charPoly", "numSpanningTrees"})
+
+
+def _mid_query(function: PostFunction) -> SqlFunction:
+    """`function` as a SQL function: the same name, signature and implementation, under a
+    SQL name of its own, since SQLite has functions named `min` and `max` already."""
+    slow = function.name in _SLOW
+    warning = "; slow, so narrow a condition with cheaper tests first" if slow else ""
+    return SqlFunction(
+        function.name,
+        function.arg_types,
+        function.result_ty,
+        f"mathql_{function.name}",
+        function.doc + warning,
+        function.implementation,
+        cost=100 if slow else 1,
+    )
+
+
+SQL_FUNCTIONS: tuple[SqlFunction, ...] = tuple(_mid_query(f) for f in FUNCTIONS)

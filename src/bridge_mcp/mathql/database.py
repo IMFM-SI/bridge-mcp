@@ -74,7 +74,8 @@ class SqlFunction:
     its signature, the SQL function it compiles to, a human description, and an
     implementation over the decoded argument values, raising `MathQLError` on an argument
     it rejects. A function with an implementation is registered on the connection under
-    `sql_name`; one without is a function SQLite already has."""
+    `sql_name`; one without is a function SQLite already has. `cost` ranks how expensive a
+    call is, 0 being as cheap as reading a column."""
 
     name: str
     arg_types: tuple[Ty, ...]
@@ -82,6 +83,7 @@ class SqlFunction:
     sql_name: str
     doc: str = ""
     implementation: Callable[[Sequence[object]], object] | None = None
+    cost: int = 0
 
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)

@@ -4,7 +4,7 @@
 
 from bridge_mcp.mathql.database import Column, Database, Example, ForeignKey, Schema
 from bridge_mcp.mathql.databases import groups, pibase, provenance
-from bridge_mcp.mathql.functions import FUNCTIONS
+from bridge_mcp.mathql.functions import FUNCTIONS, SQL_FUNCTIONS
 from bridge_mcp.mathql.types import BoolType, IntType, ListType, StringType, Ty
 
 _COLUMNS: tuple[tuple[str, Ty, str], ...] = (
@@ -262,6 +262,17 @@ database = Database(
                 "limit": 5,
             },
         ),
+        Example(
+            "the triangle-free graphs on 8 vertices with no independent set of 4 "
+            "vertices, a function called in the condition",
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["graph6", "g.graph6"]],
+                "condition": "g.num_vertices == 8 && g.num_triangles == 0 "
+                "&& independenceNumber(g.graph6) == 3",
+            },
+        ),
     ),
+    sql_functions=SQL_FUNCTIONS,
     post_functions=FUNCTIONS,
 )
