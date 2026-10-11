@@ -27,6 +27,16 @@ def test_describe_lists_available_databases() -> None:
     assert "math_data" in names
 
 
+def test_a_query_returns_its_rows_and_whether_it_was_stopped() -> None:
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["graph6", "g.graph6"]],
+        "condition": "g.num_vertices == 3 && g.num_edges == 3",
+    }
+    answer = asyncio.run(mcp.call_tool("query", request)).structured_content
+    assert answer == {"rows": [[["graph6", "Bw"]]], "truncated": False}
+
+
 def test_a_query_error_carries_its_message() -> None:
     request = {"domains": [["g", "Graph"]], "output": [["x", "g.nonesuch"]]}
     with pytest.raises(ToolError, match="domain Graph does not have a field nonesuch"):

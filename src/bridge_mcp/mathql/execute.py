@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
@@ -371,6 +373,38 @@ def register_functions(connection: sqlite3.Connection, database: Database) -> No
             )
 
 
+TIME_LIMIT = 30.0
+"""How many seconds a query may run before the database stops it."""
+
+# The moment at which the query running on this thread is to stop, or None when no query
+# is running on it. Per thread, since each tool call runs on a thread of its own and the
+# threads share one connection.
+_deadline = threading.local()
+
+
+def _past_deadline() -> bool:
+    """Whether the query running on this thread has run past its deadline."""
+    at: float | None = getattr(_deadline, "at", None)
+    return at is not None and time.monotonic() > at
+
+
+def limit_time(connection: sqlite3.Connection) -> None:
+    """Stop a query running on `connection` once the deadline `run` set for it has
+    passed. SQLite asks every thousand steps of its work; a statement run other than by
+    `run` has no deadline and is never stopped."""
+    connection.set_progress_handler(_past_deadline, 1000)
+
+
+@dataclass(frozen=True)
+class Answer:
+    """The rows a query returns, each its list of name/value pairs, and whether the time
+    limit stopped the query first. The rows of a stopped query each match it; the rows
+    it did not reach yet are missing."""
+
+    rows: list[list[tuple[str, object]]]
+    truncated: bool
+
+
 def compiled_sql(
     database: Database, is_safe_alias: Callable[[str], bool], q: query.Query
 ) -> str:
@@ -393,11 +427,25 @@ def run(
     database: Database,
     is_safe_alias: Callable[[str], bool],
     q: query.Query,
-) -> list[list[tuple[str, object]]]:
-    """Run a type-checked query, returning each row as its list of name/value pairs."""
+) -> Answer:
+    """Run a type-checked query within `TIME_LIMIT` seconds, on a connection `limit_time`
+    was applied to. Past the limit, the rows read so far are returned, marked
+    truncated."""
     rendered = compiled_sql(database, is_safe_alias, q)
     functions = {f.name: f for f in database.post_functions}
-    return [_row(q, functions, row) for row in connection.execute(rendered).fetchall()]
+    rows: list[list[tuple[str, object]]] = []
+    _deadline.at = time.monotonic() + TIME_LIMIT
+    try:
+        for row in connection.execute(rendered):
+            rows.append(_row(q, functions, row))
+    except sqlite3.OperationalError as error:
+        if str(error) == "interrupted":
+            return Answer(rows, truncated=True)
+        else:
+            raise
+    finally:
+        _deadline.at = None
+    return Answer(rows, truncated=False)
 
 
 def run_query(
@@ -405,6 +453,6 @@ def run_query(
     database: Database,
     is_safe_alias: Callable[[str], bool],
     request: Mapping[str, Any],
-) -> list[list[tuple[str, object]]]:
+) -> Answer:
     """Parse, type-check, compile, and run a query from its JSON form."""
     return run(connection, database, is_safe_alias, check_query(database, from_json(request)))

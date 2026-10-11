@@ -6,11 +6,13 @@ from collections.abc import Iterator, Sequence
 import networkx
 import pytest
 
+from bridge_mcp.mathql import execute
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import (
     compiled_sql_query,
     database_path,
+    limit_time,
     register_functions,
     run_query,
     safe_alias_predicate,
@@ -44,6 +46,7 @@ def connection() -> Iterator[sqlite3.Connection]:
         pytest.skip(f"{DB} not present; run python -m bridge_mcp.generate graphs")
     conn = sqlite3.connect(DB)
     register_functions(conn, database)
+    limit_time(conn)
     yield conn
     conn.close()
 
@@ -307,7 +310,7 @@ def test_graph_functions_over_the_bundled_graphs(connection: sqlite3.Connection)
                 ["dualEdges", "numEdges(dual)"],
             ],
         },
-    )
+    ).rows
     assert rows == [
         [
             ("graph6", "Bw"),
@@ -346,7 +349,7 @@ def test_the_stored_invariants_agree_with_the_functions(
                 ["sameChromatic", "chromaticNumber(graph6) == chromatic"],
             ],
         },
-    )
+    ).rows
     assert rows, "expected connected graphs on six vertices"
     for row in rows:
         entries = dict(row)
@@ -368,7 +371,7 @@ def test_factorize_over_the_group_orders(connection: sqlite3.Connection) -> None
             "limit": 1,
             "postprocess": [["factorization", "factorize(order)"]],
         },
-    )
+    ).rows
     assert rows == [[("order", 12), ("factorization", [[2, 2], [3, 1]])]]
 
 
@@ -383,7 +386,7 @@ def test_a_failing_call_yields_null(connection: sqlite3.Connection) -> None:
             "condition": f"g.graph6 == '{TRIANGLE}'",
             "postprocess": [["edges", "edgeList('not a graph')"]],
         },
-    )
+    ).rows
     assert rows == [[("graph6", "Bw"), ("edges", None)]]
 
 
@@ -425,7 +428,7 @@ def test_a_function_in_the_condition(connection: sqlite3.Connection) -> None:
             "output": [["graph6", "g.graph6"]],
             "condition": "g.num_vertices == 4 && diameter(g.graph6) == 1",
         },
-    )
+    ).rows
     assert rows == [[("graph6", "C~")]]
 
 
@@ -444,7 +447,7 @@ def test_a_function_in_the_output_and_the_order(connection: sqlite3.Connection) 
             "order": [["cliqueNumber(g.graph6)", "desc"]],
             "limit": 2,
         },
-    )
+    ).rows
     assert rows[0] == [("degrees", [3, 3, 3, 3]), ("omega", 4)]
     assert dict(rows[1])["omega"] == 3
 
@@ -457,7 +460,9 @@ def test_a_row_where_the_function_is_undefined_is_dropped_from_the_condition(
         "output": [["graph6", "g.graph6"], ["d", "diameter(g.graph6)"]],
         "condition": "g.num_vertices == 4",
     }
-    rows = run_query(connection, database, safe_alias_predicate(connection, database), request)
+    rows = run_query(
+        connection, database, safe_alias_predicate(connection, database), request
+    ).rows
     undefined = [row for row in rows if dict(row)["d"] is None]
     assert len(rows) == 11
     assert len(undefined) == 5
@@ -466,7 +471,7 @@ def test_a_row_where_the_function_is_undefined_is_dropped_from_the_condition(
         len(
             run_query(
                 connection, database, safe_alias_predicate(connection, database), request
-            )
+            ).rows
         )
         == 6
     )
@@ -516,11 +521,52 @@ def test_the_order_does_not_change_the_rows(connection: sqlite3.Connection) -> N
         }
         return run_query(
             connection, database, safe_alias_predicate(connection, database), request
-        )
+        ).rows
 
     cheap, costly = "g.num_vertices == 5", "diameter(g.graph6) == 2"
     assert graphs(f"{costly} && {cheap}") == graphs(f"{cheap} && {costly}")
     assert graphs(f"{costly} || {cheap}") == graphs(f"{cheap} || {costly}")
+
+
+# --- the time limit ---
+
+_EVERY_GRAPH = {
+    "domains": [["g", "Graph"]],
+    "output": [["graph6", "g.graph6"], ["n", "g.num_vertices"]],
+    "condition": "numVertices(g.graph6) == g.num_vertices",
+}
+
+
+def test_a_query_within_the_limit_is_complete(connection: sqlite3.Connection) -> None:
+    answer = run_query(
+        connection, database, safe_alias_predicate(connection, database), _EVERY_GRAPH
+    )
+    assert not answer.truncated
+    assert len(answer.rows) == connection.execute("SELECT count(*) FROM graph").fetchone()[0]
+
+
+def test_a_query_past_the_limit_returns_the_rows_found_by_then(
+    connection: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(execute, "TIME_LIMIT", 0.0)
+    answer = run_query(
+        connection, database, safe_alias_predicate(connection, database), _EVERY_GRAPH
+    )
+    assert answer.truncated
+    total = connection.execute("SELECT count(*) FROM graph").fetchone()[0]
+    assert len(answer.rows) < total
+    assert all(
+        call("numVertices", dict(row)["graph6"]) == dict(row)["n"] for row in answer.rows
+    )
+
+
+def test_a_statement_outside_a_query_has_no_limit(
+    connection: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(execute, "TIME_LIMIT", 0.0)
+    run_query(connection, database, safe_alias_predicate(connection, database), _EVERY_GRAPH)
+    statement = "SELECT count(*) FROM graph WHERE mathql_numVertices(graph6) = num_vertices"
+    assert connection.execute(statement).fetchone()[0] > 0
 
 
 def test_sqlite_keeps_its_own_min_and_max(connection: sqlite3.Connection) -> None:

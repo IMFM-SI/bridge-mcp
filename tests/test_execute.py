@@ -46,7 +46,7 @@ def test_triangle(
             "output": [["graph6", "g.graph6"], ["num_edges", "g.num_edges"]],
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
-    )
+    ).rows
     assert rows == [[("graph6", "Bw"), ("num_edges", 3)]]
 
 
@@ -62,7 +62,7 @@ def test_trees_on_five(
             "output": [["graph6", "g.graph6"]],
             "condition": "g.num_vertices == 5 && g.is_tree",
         },
-    )
+    ).rows
     assert len(rows) == 3
 
 
@@ -78,7 +78,7 @@ def test_degree_sequence_equality(
             "output": [["graph6", "g.graph6"], ["degrees", "g.degree_sequence"]],
             "condition": "g.degree_sequence == [2, 2, 2]",
         },
-    )
+    ).rows
     assert rows == [[("graph6", "Bw"), ("degrees", [2, 2, 2])]]
 
 
@@ -94,7 +94,7 @@ def test_id_output(
             "output": [["gid", "id(g)"]],
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
-    )
+    ).rows
     assert rows == [[("gid", "Bw")]]
 
 
@@ -110,7 +110,7 @@ def test_null_becomes_none(
             "output": [["diameter", "g.diameter"]],
             "condition": "!g.is_connected && g.num_vertices == 2",
         },
-    )
+    ).rows
     assert rows == [[("diameter", None)]]
 
 
@@ -128,7 +128,7 @@ def test_order_by_alias(
             "order": [["spread", "desc"]],
             "limit": 3,
         },
-    )
+    ).rows
     assert [dict(row)["spread"] for row in rows] == [3, 3, 3]
 
 
@@ -144,7 +144,7 @@ def test_a_row_is_pairs_in_output_order(
             "output": [[name, "g.num_edges"] for name in ("zeta", "alpha", "mu", "beta")],
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
         },
-    )
+    ).rows
     assert [name for name, _ in rows[0]] == ["zeta", "alpha", "mu", "beta"]
 
 
@@ -175,7 +175,7 @@ def test_postprocess_appends_its_columns(connection: sqlite3.Connection) -> None
             "condition": "g.num_vertices == 3 && g.num_edges == 3",
             "postprocess": [["k", "plus(n, 1)"], ["m", "k * 2"]],
         },
-    )
+    ).rows
     assert rows == [[("n", 3), ("k", 4), ("m", 8)]]
 
 
@@ -197,7 +197,7 @@ def test_the_two_stages_agree_on_the_same_row(
             ["in_post_equal", "ds == [2, 2, 2]"],
         ],
     }
-    rows = [dict(row) for row in run_query(connection, database, is_safe_alias, request)]
+    rows = [dict(row) for row in run_query(connection, database, is_safe_alias, request).rows]
     assert rows
     assert all(row["in_sql_defined"] == row["in_post_defined"] for row in rows)
     assert all(row["in_sql_equal"] == row["in_post_equal"] for row in rows)
@@ -212,7 +212,7 @@ def test_a_query_over_constants_touches_no_table(
         database,
         is_safe_alias,
         {"domains": [], "output": [["x", "2 + 2"], ["y", "'hi'"]]},
-    )
+    ).rows
     assert rows == [[("x", 4), ("y", "hi")]]
 
 
@@ -223,7 +223,7 @@ def test_postprocess_alone_is_a_query(connection: sqlite3.Connection) -> None:
         with_plus,
         safe_alias_predicate(connection, with_plus),
         {"domains": [], "output": [], "postprocess": [["k", "plus(2, 2)"]]},
-    )
+    ).rows
     assert rows == [[("k", 4)]]
 
 
@@ -236,7 +236,7 @@ def test_a_false_condition_leaves_no_row(
             database,
             is_safe_alias,
             {"domains": [], "output": [], "condition": "false"},
-        )
+        ).rows
         == []
     )
 
@@ -253,13 +253,13 @@ def test_naming_no_column_keeps_one_row_per_match(
     }
     rows = run_query(
         connection, with_plus, safe_alias_predicate(connection, with_plus), request
-    )
+    ).rows
     counted = run_query(
         connection,
         database,
         is_safe_alias,
         {**request, "output": [["n", "g.num_vertices"]], "postprocess": []},
-    )
+    ).rows
     assert len(rows) == len(counted) == 4
     assert rows[0] == [("k", 2)]
 
@@ -294,7 +294,7 @@ def test_division_truncates_toward_zero_in_both_stages(
             "condition": "g.num_vertices == 1",
             "postprocess": [["by_evaluator", "a / b"]],
         },
-    )
+    ).rows
     assert dict(rows[0]) == {
         "a": left,
         "b": right,
@@ -316,7 +316,7 @@ def test_a_zero_divisor_has_no_value_in_either_stage(
             "condition": "g.num_vertices == 1",
             "postprocess": [["by_evaluator", "a / b"]],
         },
-    )
+    ).rows
     assert dict(rows[0]) == {"a": 7, "b": 0, "by_database": None, "by_evaluator": None}
 
 
@@ -328,4 +328,4 @@ def test_a_zero_divisor_is_undefined_in_a_condition(
         "output": [["g6", "id(g)"]],
         "condition": "g.num_vertices == 3 && undefined (g.num_edges / (g.num_vertices - 3))",
     }
-    assert len(run_query(connection, database, is_safe_alias, request)) == 4
+    assert len(run_query(connection, database, is_safe_alias, request).rows) == 4

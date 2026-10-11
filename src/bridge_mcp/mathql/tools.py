@@ -106,9 +106,11 @@ def register(mcp: MCPServer) -> None:
         limit: int | None = None,
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
-    ) -> list[list[tuple[str, Any]]]:
-        """Run a MathQL query and return the matching rows, each a list of
-        [column name, value] pairs, in the order `output` then `postprocess` name them.
+    ) -> dict[str, Any]:
+        """Run a MathQL query and return {"rows": …, "truncated": …}. Each row is a list
+        of [column name, value] pairs, in the order `output` then `postprocess` name them.
+        A query is stopped after 30 seconds; `truncated` is then true and the rows are
+        those found by then, each a real match, with the others missing.
 
         A query ranges over one object per domain variable and returns one row per
         combination the condition holds of. The `grammar` tool gives the expression
@@ -126,7 +128,8 @@ def register(mcp: MCPServer) -> None:
         """
         opened = resolve(database)
         request = _request(domains, output, condition, order, limit, postprocess)
-        return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
+        answer = run_query(opened.connection, opened.database, opened.is_safe_alias, request)
+        return {"rows": answer.rows, "truncated": answer.truncated}
 
     @mcp.tool()
     @anticipating(MathQLError, ValueError)

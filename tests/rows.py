@@ -13,4 +13,4 @@ def rows_by_name(
 ) -> list[dict[str, object]]:
     """Run a query and key each row by its column names, which are distinct."""
     predicate = safe_alias_predicate(connection, database)
-    return [dict(row) for row in run_query(connection, database, predicate, request)]
+    return [dict(row) for row in run_query(connection, database, predicate, request).rows]

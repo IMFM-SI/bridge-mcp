@@ -40,9 +40,14 @@ A query is a JSON object:
 
 ## Results
 
-A query returns the matching rows. Each row is a list of `[name, value]` pairs: the
-output columns in the order `output` names them, then the postprocess columns in the
-order `postprocess` names them. An absent value is `null`.
+A query returns `{"rows": [...], "truncated": false}`. Each row is a list of
+`[name, value]` pairs: the output columns in the order `output` names them, then the
+postprocess columns in the order `postprocess` names them. An absent value is `null`.
+
+A query is stopped after 30 seconds. `truncated` is then `true`, and `rows` holds the
+rows found by then: each of them matches, and the rows not reached yet are missing.
+With `order`, the database sorts every row before it returns the first, so a stopped
+query with `order` returns few rows or none.
 
 ## Domains
 
