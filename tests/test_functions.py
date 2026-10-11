@@ -9,6 +9,7 @@ import pytest
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
 from bridge_mcp.mathql.execute import (
+    compiled_sql_query,
     database_path,
     register_functions,
     run_query,
@@ -469,6 +470,57 @@ def test_a_row_where_the_function_is_undefined_is_dropped_from_the_condition(
         )
         == 6
     )
+
+
+# --- the cheaper operands of && and || first ---
+
+
+def _condition_sql(connection: sqlite3.Connection, condition: str) -> str:
+    request = {
+        "domains": [["g", "Graph"]],
+        "output": [["graph6", "g.graph6"]],
+        "condition": condition,
+    }
+    return compiled_sql_query(database, safe_alias_predicate(connection, database), request)
+
+
+def test_a_column_test_precedes_a_call(connection: sqlite3.Connection) -> None:
+    rendered = _condition_sql(connection, "diameter(g.graph6) == 2 && g.num_vertices == 5")
+    assert rendered.index("num_vertices") < rendered.index("mathql_diameter")
+
+
+def test_a_chain_is_ordered_by_cost(connection: sqlite3.Connection) -> None:
+    rendered = _condition_sql(
+        connection,
+        "numSpanningTrees(g.graph6) == 3 || (diameter(g.graph6) == 2 || g.num_vertices == 5)",
+    )
+    positions = [
+        rendered.index(part)
+        for part in ("num_vertices", "mathql_diameter", "mathql_numSpanningTrees")
+    ]
+    assert positions == sorted(positions)
+
+
+def test_equal_costs_keep_the_written_order(connection: sqlite3.Connection) -> None:
+    rendered = _condition_sql(connection, "girth(g.graph6) == 4 && diameter(g.graph6) == 2")
+    assert rendered.index("mathql_girth") < rendered.index("mathql_diameter")
+
+
+def test_the_order_does_not_change_the_rows(connection: sqlite3.Connection) -> None:
+    def graphs(condition: str) -> list[list[tuple[str, object]]]:
+        request = {
+            "domains": [["g", "Graph"]],
+            "output": [["graph6", "g.graph6"]],
+            "condition": condition,
+            "order": [["g.graph6", "asc"]],
+        }
+        return run_query(
+            connection, database, safe_alias_predicate(connection, database), request
+        )
+
+    cheap, costly = "g.num_vertices == 5", "diameter(g.graph6) == 2"
+    assert graphs(f"{costly} && {cheap}") == graphs(f"{cheap} && {costly}")
+    assert graphs(f"{costly} || {cheap}") == graphs(f"{cheap} || {costly}")
 
 
 def test_sqlite_keeps_its_own_min_and_max(connection: sqlite3.Connection) -> None:

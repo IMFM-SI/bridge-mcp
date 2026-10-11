@@ -4,6 +4,7 @@ LEFT JOINs."""
 
 from __future__ import annotations
 
+import functools
 import itertools
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from typing import assert_never
 from bridge_mcp.mathql import expr, sql
 from bridge_mcp.mathql.database import Column, Database, Schema
 from bridge_mcp.mathql.errors import MathQLError
+from bridge_mcp.mathql.operators import BinaryOp
 from bridge_mcp.mathql.query import Binding, Query
 from bridge_mcp.mathql.types import ListType, ProductType
 
@@ -36,12 +38,14 @@ ContextEntry = DomainEntry | ConstEntry
 @dataclass(frozen=True)
 class SqlContext:
     """The resolution context of a compilation: the entry of each identifier, the schema
-    of each domain, the SQL function each MathQL function compiles to, and whether a name
-    is free of the column names of the database, and so usable as an alias."""
+    of each domain, the SQL function each MathQL function compiles to and the cost of a
+    call to it, and whether a name is free of the column names of the database, and so
+    usable as an alias."""
 
     idents: Mapping[str, ContextEntry]
     schemas: Mapping[str, Schema]
     functions: Mapping[str, str]
+    costs: Mapping[str, int]
     is_safe_alias: Callable[[str], bool]
 
     def get_function(self, name: str) -> str:
@@ -161,6 +165,49 @@ def _row_presence(
         return sql.IsNull(column) if negated else sql.IsNotNull(column)
 
 
+def _cost(ctx: SqlContext, e: expr.Expr) -> int:
+    """The sum of the costs of the function calls in `e`, outside its domain
+    expressions."""
+    match e:
+        case expr.Call(name, args):
+            return ctx.costs.get(name, 0) + sum(_cost(ctx, arg) for arg in args)
+        case expr.UnOp(_, operand) | expr.Proj(operand, _):
+            return _cost(ctx, operand)
+        case expr.Defined(operand) | expr.Undefined(operand):
+            return _cost(ctx, operand)
+        case expr.BinOp(_, left, right) | expr.Compare(_, _, left, right):
+            return _cost(ctx, left) + _cost(ctx, right)
+        case expr.Ite(cond, then_, else_):
+            return _cost(ctx, cond) + _cost(ctx, then_) + _cost(ctx, else_)
+        case expr.TupleExpr(items) | expr.ListExpr(items):
+            return sum(_cost(ctx, item) for item in items)
+        case _:
+            return 0
+
+
+def _operands(op: BinaryOp, e: expr.Expr) -> list[expr.Expr]:
+    """The operands of the chain of `op` that `e` heads: `a && (b && c)` has `a`, `b`
+    and `c`."""
+    match e:
+        case expr.BinOp(head, left, right) if head == op:
+            return _operands(op, left) + _operands(op, right)
+        case _:
+            return [e]
+
+
+def _cheapest_first(
+    ctx: SqlContext, state: CompileState, op: BinaryOp, e: expr.Expr
+) -> sql.Expr:
+    """The chain of `&&` or `||` that `e` heads, its operands ordered by cost, the
+    written order kept among equal costs. SQLite evaluates a condition's operands in
+    order and stops at the first that decides it, so an expensive call runs on fewer
+    rows. The order does not change the value: both operators are commutative, absent
+    values included, and no operand fails."""
+    operands = sorted(_operands(op, e), key=lambda operand: _cost(ctx, operand))
+    compiled = [compile_expr(ctx, state, operand) for operand in operands]
+    return functools.reduce(lambda left, right: sql.BinOp(op, left, right), compiled)
+
+
 def compile_expr(ctx: SqlContext, state: CompileState, e: expr.Expr) -> sql.Expr:
     """Compile a typed expression to a SQL expression."""
     match e:
@@ -190,6 +237,8 @@ def compile_expr(ctx: SqlContext, state: CompileState, e: expr.Expr) -> sql.Expr
             return sql.Call(ctx.get_function(name), compiled)
         case expr.UnOp(op, operand):
             return sql.UnOp(op, compile_expr(ctx, state, operand))
+        case expr.BinOp(BinaryOp.AND | BinaryOp.OR as op, _, _):
+            return _cheapest_first(ctx, state, op, e)
         case expr.BinOp(op, left, right):
             return sql.BinOp(
                 op, compile_expr(ctx, state, left), compile_expr(ctx, state, right)
@@ -253,10 +302,12 @@ def compile_query(
         **{b.var: DomainEntry(b.domain) for b in q.variables},
     }
     functions = {f.name: f.sql_name for f in database.sql_functions}
+    costs = {f.name: f.cost for f in database.sql_functions}
     ctx = SqlContext(
         idents=idents,
         schemas=database.domains,
         functions=functions,
+        costs=costs,
         is_safe_alias=is_safe_alias,
     )
     state = CompileState(next_alias=1, var_alias={}, joins=[], hoisted={})
@@ -270,6 +321,7 @@ def compile_query(
         idents={**idents, **{name: ConstEntry(sql.Ref(a)) for name, a, _ in columns}},
         schemas=database.domains,
         functions=functions,
+        costs=costs,
         is_safe_alias=is_safe_alias,
     )
     cond = compile_expr(ctx, state, q.condition)
