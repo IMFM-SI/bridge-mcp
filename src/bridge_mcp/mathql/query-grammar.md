@@ -25,7 +25,12 @@ A query is a JSON object:
   value is the value of the expression. The list order is the column order of every
   row. Each output expression may refer to the variables bound by `domains`.
 - `condition` (optional, default `true`) restricts the result to the objects, or
-  tuples of objects, that satisfy it; it must have type `bool`.
+  tuples of objects, that satisfy it; it must have type `bool`. On a row where a value
+  it uses is absent, the condition may be `null`, neither true nor false; such a row is
+  left out, unless the `query` tool is given `mode: "complete"` (see *Results*). The
+  operands of `&&` and of `||` are evaluated cheapest first, so a costly function call
+  runs only on the rows the cheaper operands leave; the order does not change the
+  result.
 - `order` (optional) sorts the result by one or more scalar expressions, each
   ascending or descending; an order expression may refer to the output columns
   by name.
@@ -43,6 +48,12 @@ A query is a JSON object:
 A query returns `{"rows": [...], "truncated": false}`. Each row is a list of
 `[name, value]` pairs: the output columns in the order `output` names them, then the
 postprocess columns in the order `postprocess` names them. An absent value is `null`.
+
+With `mode: "complete"`, a row on which the condition is `null` is returned as well,
+and each row carries `["certain", true]` when the condition is true on it and
+`["certain", false]` when it is `null`, placed after the output columns and before the
+postprocess columns. No output or postprocess column may then be named `certain`. The
+default, `mode: "sound"`, returns only the rows the condition is true on.
 
 A query is stopped after 30 seconds. `truncated` is then `true`, and `rows` holds the
 rows found by then: each of them matches, and the rows not reached yet are missing.
@@ -156,7 +167,9 @@ The meaning and types of the above expressions is as follows:
 - `f(e₁, …, eₙ)` — the function `f` applied to the given arguments; its type is `f`'s
   declared result type. Each database declares its functions in two groups: those
   available in `condition`, `output` and `order`, and those available in
-  `postprocess`. The `describe` tool lists both groups with their signatures.
+  `postprocess`; one function may belong to both. The `describe` tool lists both groups
+  with their signatures. A call on which the function is undefined, such as the
+  diameter of a disconnected graph, has the value `null`.
 - `e.i` — the `i`-th component (counting from zero) of the tuple `e`; its type is
   that component's type.
 - `42` – integer literal of type `int`
