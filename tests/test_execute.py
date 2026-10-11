@@ -8,7 +8,12 @@ import pytest
 
 from bridge_mcp.mathql.databases.math_data import database
 from bridge_mcp.mathql.errors import MathQLError
-from bridge_mcp.mathql.execute import database_path, run_query, safe_alias_predicate
+from bridge_mcp.mathql.execute import (
+    database_path,
+    register_functions,
+    run_query,
+    safe_alias_predicate,
+)
 from tests.toy import DATABASE as TOY
 
 DB = database_path()
@@ -19,6 +24,7 @@ def connection() -> Iterator[sqlite3.Connection]:
     if not DB.exists():
         pytest.skip(f"{DB} not present; run python -m bridge_mcp.generate graphs")
     conn = sqlite3.connect(DB)
+    register_functions(conn, database)
     yield conn
     conn.close()
 

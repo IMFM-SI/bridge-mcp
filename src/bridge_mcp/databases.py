@@ -10,7 +10,11 @@ from pathlib import Path
 from bridge_mcp.connection import open_read_only, restrict_to_queries
 from bridge_mcp.mathql.database import Database
 from bridge_mcp.mathql.databases import math_data, sym_ob_small
-from bridge_mcp.mathql.execute import database_path, safe_alias_predicate
+from bridge_mcp.mathql.execute import (
+    database_path,
+    register_functions,
+    safe_alias_predicate,
+)
 
 
 @dataclass(frozen=True)
@@ -23,9 +27,11 @@ class Open:
 
 
 def _open(database: Database, path: Path) -> Open:
-    """Open `path` for `database`, admitting queries alone from the first statement."""
+    """Open `path` for `database`, admitting queries alone from the first statement, with
+    the database's SQL functions callable."""
     connection = open_read_only(path)
     restrict_to_queries(connection)
+    register_functions(connection, database)
     return Open(database, connection, safe_alias_predicate(connection, database))
 
 

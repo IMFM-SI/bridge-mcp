@@ -93,6 +93,43 @@ def _as_str(value: object) -> str:
         raise MathQLError(f"expected a string, got {value!r}")
 
 
+def _encode_cell(ty: Ty, value: object) -> int | str | None:
+    """A value as SQLite stores it at `ty`, the inverse of `_decode_cell`: a boolean as 0
+    or 1, a list or a product as JSON text, and None as NULL."""
+    if value is None:
+        return None
+    else:
+        match ty:
+            case IntType():
+                return _as_int(value)
+            case BoolType():
+                return int(_as_bool(value))
+            case StringType():
+                return _as_str(value)
+            case ListType() | ProductType():
+                return canonical(value)
+        assert_never(ty)
+
+
+def _as_sql_function(
+    arg_types: Sequence[Ty],
+    result_ty: Ty,
+    implementation: Callable[[Sequence[object]], object],
+) -> Callable[..., int | str | None]:
+    """An implementation as SQLite calls it: on the stored argument values, returning the
+    stored result. A failure yields NULL, as it yields an absent value in postprocess, so
+    a row on which the function is undefined does not abort the query."""
+
+    def call(*cells: object) -> int | str | None:
+        try:
+            args = [_decode_cell(ty, cell) for ty, cell in zip(arg_types, cells, strict=True)]
+            return _encode_cell(result_ty, implementation(args))
+        except Exception:
+            return None
+
+    return call
+
+
 def _eval_unary_op(op: UnaryOp, value: object) -> object:
     match op:
         case UnaryOp.NOT:
@@ -317,6 +354,21 @@ def safe_alias_predicate(
     )
     taken = {name.lower() for name in columns} | {"rowid", "oid", "_rowid_"}
     return lambda name: name.lower() not in taken
+
+
+def register_functions(connection: sqlite3.Connection, database: Database) -> None:
+    """Make each SQL function of `database` that has an implementation callable on
+    `connection`, under its SQL name."""
+    for function in database.sql_functions:
+        if function.implementation is not None:
+            connection.create_function(
+                function.sql_name,
+                len(function.arg_types),
+                _as_sql_function(
+                    function.arg_types, function.result_ty, function.implementation
+                ),
+                deterministic=True,
+            )
 
 
 def compiled_sql(

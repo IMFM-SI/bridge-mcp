@@ -71,13 +71,17 @@ class Constant:
 @dataclass(frozen=True)
 class SqlFunction:
     """A function callable in the condition, the output, and the order: its MathQL name,
-    its signature, the SQL function it compiles to, and a human description."""
+    its signature, the SQL function it compiles to, a human description, and an
+    implementation over the decoded argument values, raising `MathQLError` on an argument
+    it rejects. A function with an implementation is registered on the connection under
+    `sql_name`; one without is a function SQLite already has."""
 
     name: str
     arg_types: tuple[Ty, ...]
     result_ty: Ty
     sql_name: str
     doc: str = ""
+    implementation: Callable[[Sequence[object]], object] | None = None
 
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)
