@@ -10,15 +10,17 @@ what ships as the MCP server. See *How the two repositories relate* below, and
 
 ## State
 
-Verified on 2026-10-09 in `.venv` (Python 3.14.3, mcp 2.2.0):
+Verified on 2026-10-12 on branch `mid-querry-functions` in `.venv` (Python 3.14.7, mcp
+2.3.0):
 
-- `pytest -q` — 239 passed, 4 skipped.
-- `mypy src` — clean, 44 files.
-- `ruff format --check .` — clean, 75 files.
-- `ruff check .` — **31 findings, all of them present at `0358663` too**, before this work.
-  They are `LOG015`, `ISC004`, `DTZ011`, `BLE001`, `EXE001` in `generate/` and `scripts/`,
-  plus two `I001` import-sort findings. CI runs `ruff check .` and so failed before this
-  work as well.
+- `pytest -q` — 309 passed, 4 skipped, 1 failed: the networkx 3.7 test described under
+  *Facts the next session will meet*.
+- `mypy src` — clean, 45 files.
+- `ruff format --check .` — clean, 79 files.
+- `ruff check .` — **30 findings, all of them present at `ea20671` too**. They are
+  `LOG015`, `ISC004`, `EXE001` in `generate/` and `scripts/`, two `I001` import-sort
+  findings, and one `BLE001` in `execute.eval_postprocess`. CI runs `ruff check .` and so
+  fails on `main` as well.
 
 The 4 skips are `tests/test_sym_ob.py`: `sym-ob-small.db` is not present. It is a ≈ 298 MB
 download, see `README.md`.
@@ -174,8 +176,10 @@ These are decided. Each is to be done.
 
 ## Python functions mid-query
 
-On branch `mid-querry-functions`, not yet merged or pushed: six commits on top of
-`ea20671`, the last of which updates this file. Python only; the Lean implementation is
+On branch `mid-querry-functions`, pushed and not yet merged: six commits on top of
+`ea20671`, the last of which updates this file. `ea20671` is the `postprocess-functions`
+work merged in, which is not on `main` either, so a pull request from this branch carries
+both. Python only; the Lean implementation is
 unchanged, since database-declared functions are incidental functionality (see *How the
 two repositories relate*).
 
