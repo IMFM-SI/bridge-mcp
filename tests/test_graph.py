@@ -7,10 +7,10 @@ import pytest
 from bridge_mcp.graph.tools import (
     articulation_points,
     bridges,
-    centrality,
     center,
-    connected_components,
+    centrality,
     coloring,
+    connected_components,
     draw_graph,
     draw_graph6,
     edge_list,
