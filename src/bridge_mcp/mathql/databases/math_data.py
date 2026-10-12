@@ -4,6 +4,7 @@
 
 from bridge_mcp.mathql.database import Column, Database, Example, ForeignKey, Schema
 from bridge_mcp.mathql.databases import groups, pibase, provenance
+from bridge_mcp.mathql.functions import FUNCTIONS, SQL_FUNCTIONS
 from bridge_mcp.mathql.types import BoolType, IntType, ListType, StringType, Ty
 
 _COLUMNS: tuple[tuple[str, Ty, str], ...] = (
@@ -210,5 +211,68 @@ database = Database(
                 "condition": "p.domain == 'Trait' && p.field == 'value'",
             },
         ),
+        Example(
+            "the edges and the extreme degrees of the graphs on 4 vertices",
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["graph6", "g.graph6"], ["degrees", "g.degree_sequence"]],
+                "condition": "g.num_vertices == 4",
+                "postprocess": [
+                    ["edges", "edgeList(graph6)"],
+                    ["largest", "max(degrees)"],
+                    ["smallest", "min(degrees)"],
+                ],
+            },
+        ),
+        Example(
+            "the complement of each connected graph on 5 vertices, and its edge count",
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["graph6", "g.graph6"]],
+                "condition": "g.num_vertices == 5 && g.is_connected",
+                "postprocess": [
+                    ["complement", "complement(graph6)"],
+                    ["complementEdges", "numEdges(complement)"],
+                    ["complementConnected", "defined diameter(complement)"],
+                ],
+                "limit": 5,
+            },
+        ),
+        Example(
+            "the spanning-tree count and the characteristic polynomial of connected "
+            "graphs on 6 vertices",
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["graph6", "g.graph6"]],
+                "condition": "g.num_vertices == 6 && g.is_connected",
+                "postprocess": [
+                    ["spanningTrees", "numSpanningTrees(graph6)"],
+                    ["charPoly", "charPoly(graph6)"],
+                ],
+                "limit": 5,
+            },
+        ),
+        Example(
+            "the order of each group of order at most 20, factorized",
+            {
+                "domains": [["g", "Group"]],
+                "output": [["name", "g.structure_description"], ["order", "g.order"]],
+                "condition": "g.order <= 20",
+                "postprocess": [["factorization", "factorize(order)"]],
+                "limit": 5,
+            },
+        ),
+        Example(
+            "the triangle-free graphs on 8 vertices with no independent set of 4 "
+            "vertices, a function called in the condition",
+            {
+                "domains": [["g", "Graph"]],
+                "output": [["graph6", "g.graph6"]],
+                "condition": "g.num_vertices == 8 && g.num_triangles == 0 "
+                "&& independenceNumber(g.graph6) == 3",
+            },
+        ),
     ),
+    sql_functions=SQL_FUNCTIONS,
+    post_functions=FUNCTIONS,
 )

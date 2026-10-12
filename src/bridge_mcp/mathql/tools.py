@@ -24,7 +24,8 @@ grammar."""
 
 
 def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
-    """The instruction lines for one database: overview, domains, two examples."""
+    """The instruction lines for one database: overview, domains, functions, two
+    examples."""
     lines = [f"## Database `{name}`", schema["overview"], "", "### Domains and fields"]
     for domain in schema["domains"]:
         lines.append(f"- {domain['name']}: {domain['doc']}")
@@ -39,6 +40,18 @@ def _database_section(name: str, schema: dict[str, Any]) -> list[str]:
             )
             for field in domain["domainFields"]:
                 lines.append(f"    {field['label']} → {field['domain']} — {field['doc']}")
+    for key, where in (
+        ("sqlFunctions", "`condition`, `output` and `order`"),
+        ("postFunctions", "`postprocess`"),
+    ):
+        if schema[key]:
+            lines += ["", f"### Functions callable in {where}"]
+            for function in schema[key]:
+                arguments = ", ".join(function["arguments"])
+                lines.append(
+                    f"- {function['name']}({arguments}) : {function['result']}"
+                    f" — {function['doc']}"
+                )
     lines += ["", "### Examples (call `describe` for the full list)"]
     for example in schema["examples"][:2]:
         lines.append(f"- {example['note']}: {json.dumps(example['query'])}")
@@ -93,9 +106,19 @@ def register(mcp: MCPServer) -> None:
         limit: int | None = None,
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
-    ) -> list[list[tuple[str, Any]]]:
-        """Run a MathQL query and return the matching rows, each a list of
-        [column name, value] pairs, in the order `output` then `postprocess` name them.
+        mode: Literal["sound", "complete"] = "sound",
+    ) -> dict[str, Any]:
+        """Run a MathQL query and return {"rows": …, "truncated": …}. Each row is a list
+        of [column name, value] pairs, in the order `output` then `postprocess` name them.
+        A query is stopped after 30 seconds; `truncated` is then true and the rows are
+        those found by then, each a real match, with the others missing.
+
+        A condition is neither true nor false on a row where a value it uses is absent,
+        such as the diameter of a disconnected graph. `mode` says what such a row does:
+        "sound" leaves it out, so every row returned matches; "complete" keeps it, so no
+        row that might match is missing, and each row then carries ["certain", true] when
+        the condition holds there and ["certain", false] when it is unknown, placed after
+        the output columns.
 
         A query ranges over one object per domain variable and returns one row per
         combination the condition holds of. The `grammar` tool gives the expression
@@ -110,10 +133,14 @@ def register(mcp: MCPServer) -> None:
         postprocess: [column name, expression] pairs computed per row after the database
             answers; each may name an output column and the entries before it.
         database: which database to query (optional; the default is the first).
+        mode: "sound" (the default) or "complete", as above.
         """
         opened = resolve(database)
         request = _request(domains, output, condition, order, limit, postprocess)
-        return run_query(opened.connection, opened.database, opened.is_safe_alias, request)
+        answer = run_query(
+            opened.connection, opened.database, opened.is_safe_alias, request, mode
+        )
+        return {"rows": answer.rows, "truncated": answer.truncated}
 
     @mcp.tool()
     @anticipating(MathQLError, ValueError)
@@ -125,6 +152,7 @@ def register(mcp: MCPServer) -> None:
         limit: int | None = None,
         postprocess: list[tuple[str, str]] | None = None,
         database: str | None = None,
+        mode: Literal["sound", "complete"] = "sound",
     ) -> str:
         """The SQL SELECT statement a MathQL query compiles to, without running it.
 
@@ -142,15 +170,16 @@ def register(mcp: MCPServer) -> None:
         postprocess: [column name, expression] pairs computed per row after the database
             answers.
         database: which database to compile against (optional; the default is the first).
+        mode: "sound" (the default) or "complete", as `query` takes it.
         """
         opened = resolve(database)
         request = _request(domains, output, condition, order, limit, postprocess)
-        return compiled_sql_query(opened.database, opened.is_safe_alias, request)
+        return compiled_sql_query(opened.database, opened.is_safe_alias, request, mode)
 
     @mcp.tool()
     @anticipating(ValueError)
     def describe(database: str | None = None) -> dict[str, object]:
-        """Describe a database: its domains, fields, constants, and examples.
+        """Describe a database: its domains, fields, constants, functions, and examples.
 
         With no `database`, list the available databases and their overviews.
         """

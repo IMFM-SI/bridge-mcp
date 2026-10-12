@@ -10,15 +10,17 @@ what ships as the MCP server. See *How the two repositories relate* below, and
 
 ## State
 
-Verified on 2026-10-09 in `.venv` (Python 3.14.3, mcp 2.2.0):
+Verified on 2026-10-12 on branch `mid-querry-functions` in `.venv` (Python 3.14.7, mcp
+2.3.0):
 
-- `pytest -q` — 239 passed, 4 skipped.
-- `mypy src` — clean, 44 files.
-- `ruff format --check .` — clean, 75 files.
-- `ruff check .` — **31 findings, all of them present at `0358663` too**, before this work.
-  They are `LOG015`, `ISC004`, `DTZ011`, `BLE001`, `EXE001` in `generate/` and `scripts/`,
-  plus two `I001` import-sort findings. CI runs `ruff check .` and so failed before this
-  work as well.
+- `pytest -q` — 309 passed, 4 skipped, 1 failed: the networkx 3.7 test described under
+  *Facts the next session will meet*.
+- `mypy src` — clean, 45 files.
+- `ruff format --check .` — clean, 79 files.
+- `ruff check .` — **30 findings, all of them present at `ea20671` too**. They are
+  `LOG015`, `ISC004`, `EXE001` in `generate/` and `scripts/`, two `I001` import-sort
+  findings, and one `BLE001` in `execute.eval_postprocess`. CI runs `ruff check .` and so
+  fails on `main` as well.
 
 The 4 skips are `tests/test_sym_ob.py`: `sym-ob-small.db` is not present. It is a ≈ 298 MB
 download, see `README.md`.
@@ -87,7 +89,8 @@ generator, never by a tool.
 ### Division semantics
 
 `/` must mean what SQLite's `/` means, because the condition, output and order clauses
-reach the database as SQL and only `postprocess` is evaluated in Python. Two places where
+reach the database as SQL and only `postprocess` is evaluated by Python's evaluator. Two
+places where
 Python does not agree, both handled in `execute._quotient`:
 
 - SQLite truncates toward zero; Python's `//` floors. `-7 / 2` is `-3`, not `-4`.
@@ -105,8 +108,10 @@ drive it as a client over stdio:
 ```python
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-params = StdioServerParameters(command=".venv/bin/bridge-mcp",
-                               args=["--components", "mathql,pibase,networkx,sql"])
+
+params = StdioServerParameters(
+    command=".venv/bin/bridge-mcp", args=["--components", "mathql,pibase,networkx,sql"]
+)
 ```
 
 `describe` gives the schema; do not read the database descriptors to answer schema
@@ -169,26 +174,55 @@ These are decided. Each is to be done.
    evidence. The Python implementation needs the same fix after. In short: a boolean
    inside a tuple or a list comes back as `1` or `0` instead of `true` or `false`.
 
-## A plan mentioned but not recorded
+## Python functions mid-query
 
-On 2026-10-09 the user recalled a plan to let MathQL queries refer directly to Python
-functions. Neither repository and no saved session transcript records it. Ask the user
-what it is before acting on it.
+On branch `mid-querry-functions`, pushed and not yet merged: six commits on top of
+`ea20671`, the last of which updates this file. `ea20671` is the `postprocess-functions`
+work merged in, which is not on `main` either, so a pull request from this branch carries
+both. Python only; the Lean implementation is
+unchanged, since database-declared functions are incidental functionality (see *How the
+two repositories relate*).
 
-The nearest existing mechanism is the *postprocess function*: a function implemented in
-the host language, declared by a database, and callable by name from the `postprocess`
-clause alone, since the other clauses run in SQLite. In Python it is `PostFunction` in
-`bridge-mcp/src/bridge_mcp/mathql/database.py`; in Lean, `postFunction` in
-`MathQL/MathQL/Database.lean`. No real database declares one. The only one is `plus`, in the
-test databases of both repositories.
+The nineteen functions of `mathql/functions.py` (`FUNCTIONS`, postprocess functions) are
+also declared as SQL functions (`SQL_FUNCTIONS`), callable in `condition`, `output` and
+`order`. Both `math_data` and `sym_ob_small` declare them.
+
+- **Registration.** A `SqlFunction` with an `implementation` is registered on the
+  connection by `execute.register_functions`, under the SQL name `mathql_<name>`; the
+  prefix keeps SQLite's own `min` and `max`. The wrapper decodes the arguments at their
+  declared types, encodes the result as SQLite stores it, and turns any failure into
+  `NULL`, since an exception escaping it aborts the query. Each function remembers its 256
+  most recent results, so a call SQLite repeats on one row is computed once.
+  `databases._open` registers them; a test that opens its own connection must call
+  `register_functions` too, or SQLite reports `no such function`.
+- **Cheapest first.** `SqlFunction.cost` is 0 for a function SQLite has, 1 for a declared
+  one, and 100 for `charPoly` and `numSpanningTrees`, whose descriptions warn that they are
+  slow (≈ 1.5 ms and ≈ 12 ms per graph; over all 14,281 graphs, 22 s and 174 s). The
+  compiler orders the operands of each chain of `&&` or `||` by cost. SQLite evaluates a
+  `WHERE` in the written order and stops at the first operand that decides it; it does not
+  reorder by itself.
+- **Time limit.** `execute.limit_time` installs a progress handler that stops a query
+  after `TIME_LIMIT` (30 s), with a per-thread deadline since tool calls share one
+  connection. `run` returns an `Answer`: the rows read so far and `truncated`. The `query`
+  tool returns `{"rows": [...], "truncated": bool}`, no longer a bare list.
+- **Sound and complete.** A condition is `NULL` on a row where a value it uses is absent.
+  The `query` and `compile` tools take `mode`: `"sound"` (default, `WHERE c`) or
+  `"complete"` (`WHERE (c) IS NOT FALSE`, with the column `(c) IS TRUE` returned as
+  `["certain", bool]` after the output columns). `mode` is a tool parameter, not a MathQL
+  clause.
+
+`query-grammar.md` and the tool descriptions state all of this to the calling model.
 
 ## Facts the next session will meet
 
 Nothing has been decided about these. They are recorded so they do not surprise anyone.
 
-- `ruff check .` reports 31 findings, the same 31 it reported at `0358663` before this work,
-  so continuous integration's lint step fails on `main` too.
+- `ruff check .` reports 31 findings on `main`, the same 31 it reported at `0358663`, so
+  continuous integration's lint step fails on `main` too. On `mid-querry-functions` it
+  reports 30, as at `ea20671`.
 - The maniplex database `sym-ob-small.db` is absent, so `tests/test_sym_ob.py` is skipped.
+- `tests/test_server.py::test_a_malformed_graph6_string_carries_its_message` fails with
+  networkx 3.7, whose graph6 error message does not contain the word `graph6`.
 
 ## Working agreements for whoever continues
 

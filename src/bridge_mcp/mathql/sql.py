@@ -72,6 +72,20 @@ class IsNotNull:
 
 
 @dataclass(frozen=True)
+class IsTrue:
+    """True when the expression is true; false when it is false or NULL."""
+
+    expr: Expr
+
+
+@dataclass(frozen=True)
+class IsNotFalse:
+    """True when the expression is true or NULL; false when it is false."""
+
+    expr: Expr
+
+
+@dataclass(frozen=True)
 class Case:
     cond: Expr
     then_: Expr
@@ -116,6 +130,8 @@ Expr = (
     | Compare
     | IsNull
     | IsNotNull
+    | IsTrue
+    | IsNotFalse
     | Case
     | Call
     | Json
@@ -141,6 +157,8 @@ def is_constant(e: Expr) -> bool:
         case Col() | Ref() | Call():
             return False
         case UnOp(_, operand) | IsNull(operand) | IsNotNull(operand) | Json(operand):
+            return is_constant(operand)
+        case IsTrue(operand) | IsNotFalse(operand):
             return is_constant(operand)
         case JsonExtract(operand, _):
             return is_constant(operand)
@@ -238,6 +256,10 @@ def render(e: Expr) -> str:
             return f"({render(expr)} IS NULL)"
         case IsNotNull(expr):
             return f"({render(expr)} IS NOT NULL)"
+        case IsTrue(expr):
+            return f"({render(expr)} IS TRUE)"
+        case IsNotFalse(expr):
+            return f"({render(expr)} IS NOT FALSE)"
         case Case(cond, then_, else_):
             return f"(CASE WHEN {render(cond)} THEN {render(then_)} ELSE {render(else_)} END)"
         case Call(name, args):

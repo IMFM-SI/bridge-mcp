@@ -5,7 +5,6 @@ from collections.abc import Callable
 from typing import Any
 
 import networkx
-
 from mcp.server.mcpserver import MCPServer
 
 from bridge_mcp.failure import anticipating
