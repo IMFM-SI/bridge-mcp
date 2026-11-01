@@ -22,7 +22,7 @@ class PostFunction:
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)
 ```
-I would add `sql_name` so the names of the native SQLite functions don't get mixed up with Python functions.
+I would add `sql_name` so the names of the native SQLite functions don't get mixed up with Python functions. Each python function could have `mathql_` prefix. We could implement 
 ```py
 @dataclass(frozen=True)
 class CallbackFunction:
@@ -35,6 +35,9 @@ class CallbackFunction:
     def signature(self) -> Signature:
         return Signature(self.arg_types, self.result_ty)
 ```
+
+We could also add `doc: str = ""` so each fuction has a documentation upon implementation.
+
 
 In [`bridge-query-language/MathQL/MathQL/Database.lean`](../../bridge-query-language/MathQL/MathQL/Database.lean) on line 45 there are the signatures of functions.
 
@@ -79,6 +82,44 @@ Example condition:
   /-- Callback functions -/
   callbackFunction : List (Ident × (List Ty × Ty) × String)
 ```
-
-
 - Can we do a similar thing in PostgreSQL?
+
+
+# Concrete implementation
+
+- add to `database.py`
+    ```py
+    class CallbackFunction:
+    """A Python function callable in the condition, the output, and the order: its MathQL
+    name, its signature, the name it is registered under in SQLite, an implementation
+    over the decoded argument values, and a human description."""
+    name: str
+    arg_types: tuple[Ty, ...]
+    result_ty: Ty
+    sql_name: str1
+    implementation: Callable[..., object]
+    doc: str = ""
+        
+    def signature(self) -> Signature:
+        return Signature(self.arg_types, self.result_ty)
+    ```
+
+- change `compile.py` line 255
+    ```py 
+    functions = {f.name: f.sql_name for f in database.sql_functions}
+    ```
+    turns into
+    ```py 
+    functions = {f.name: f.sql_name for f in (*database.sql_functions, *database.callback_functions)}
+    ```
+- New `src/bridge_mcp/mathql/databases/functions.py`:
+    ```py 
+    def _non_edges(n: int, m: int) -> int:
+    """How many edges are missing for the graph to be complete."""
+    return n * (n - 1) // 2 - m
+
+    NON_EDGES = CallbackFunction(
+        "non_edges", (IntType(), IntType()), IntType(), "mathql_non_edges", _non_edges,
+        doc="non_edges(n, m): the number of edges missing from a graph on n vertices with m edges",
+    )
+    ```
