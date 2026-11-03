@@ -97,9 +97,11 @@ structure Database where
 ```
 I propose we use the same signature as `sqlFunction`. 
 - Can we do a similar thing in PostgreSQL?
-  Partly. PostgreSQL can run Python functions (PL/Python), but they must be installed on
-  the database server with `CREATE FUNCTION`; a program cannot register them on its
-  connection the way SQLite allows. Out of scope for this plan.
+    Claude says:
+        Partly. PostgreSQL can run Python functions (PL/Python), but they must be installed on
+        the database server with `CREATE FUNCTION`; a program cannot register them on its
+        connection the way SQLite allows. Out of scope for this plan.
+    TODO: Verify this
 
 
 # Concrete implementation
