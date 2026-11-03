@@ -44,11 +44,11 @@ class CallbackFunction:
         return Signature(self.arg_types, self.result_ty)
 ```
 
-We also add `doc: str = ""` so each function has documentation upon implementation.
+We could also add `doc: str = ""` so each function has documentation upon implementation.
 
 One deliberate difference from `PostFunction`: `PostFunction.implementation` receives
-**one list** of arguments (`implementation(args)`), while `CallbackFunction.implementation`
-receives them **spread out** (`implementation(*args)`). Spread-out arguments let each
+one list of arguments (`implementation(args)`), while `CallbackFunction.implementation`
+receives them spread out (`implementation(*args)`). Spread-out arguments let each
 function name and type its parameters (`def _non_edges(n: int, m: int) -> int`), which
 strict mypy can check. With one list, every function would first have to unpack and
 check `object` values itself.
